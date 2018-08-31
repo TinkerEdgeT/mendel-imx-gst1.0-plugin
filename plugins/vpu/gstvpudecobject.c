@@ -19,7 +19,7 @@
  */
 
 #include <string.h>
-#include <libdrm/drm_fourcc.h>
+#include <libdrm/drm_fourcc_imx.h>
 #include <gst/video/gstvideometa.h>
 #include <gst/video/gstvideohdr10meta.h>
 #include "gstimxcommon.h"
