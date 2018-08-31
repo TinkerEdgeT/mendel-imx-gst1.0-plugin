@@ -44,7 +44,7 @@
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
 #endif
-#include <libdrm/drm_fourcc_imx.h>
+#include <drm_fourcc_imx.h>
 #include "gstimxcommon.h"
 #include "gstvpuallocator.h"
 #include "gstvpudec.h"
