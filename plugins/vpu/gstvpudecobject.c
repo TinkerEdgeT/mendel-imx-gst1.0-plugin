@@ -318,11 +318,11 @@ gst_vpu_dec_object_start (GstVpuDecObject * vpu_dec_object)
         gst_vpu_dec_object_strerror(ret));
   }
 
-  g_print("====== VPUDEC: %s build on %s %s. ======\n",  (VERSION),__DATE__,__TIME__);;
-  g_print("\twrapper: %d.%d.%d (%s)\n", wrapper_version.nMajor, wrapper_version.nMinor, 
-    wrapper_version.nRelease, (wrapper_version.pBinary? wrapper_version.pBinary:"unknow"));
-  g_print("\tvpulib: %d.%d.%d\n", version.nLibMajor, version.nLibMinor, version.nLibRelease);
-  g_print("\tfirmware: %d.%d.%d.%d\n", version.nFwMajor, version.nFwMinor, version.nFwRelease, version.nFwCode);
+  GST_INFO_OBJECT(vpu_dec_object, "====== VPUDEC: %s build on %s %s. ======",  (VERSION),__DATE__,__TIME__);
+  GST_INFO_OBJECT(vpu_dec_object, "wrapper: %d.%d.%d (%s)", wrapper_version.nMajor, wrapper_version.nMinor,
+      wrapper_version.nRelease, (wrapper_version.pBinary ? wrapper_version.pBinary : "unknown"));
+  GST_INFO_OBJECT(vpu_dec_object, "vpulib: %d.%d.%d", version.nLibMajor, version.nLibMinor, version.nLibRelease);
+  GST_INFO_OBJECT(vpu_dec_object, "firmware: %d.%d.%d.%d", version.nFwMajor, version.nFwMinor, version.nFwRelease, version.nFwCode);
 
   /* mem_info contains information about how to set up memory blocks
    * the VPU uses as temporary storage (they are "work buffers") */
