@@ -781,7 +781,6 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   GST_INFO_OBJECT(vpu_dec_object, "using %s as video output format", gst_video_format_to_string(fmt));
 
   /* Create the output state */
-  //FIXME: set max resolution to avoid buffer reallocate when resolution change.
   vpu_dec_object->output_state = state =
     gst_video_decoder_set_output_state (bdec, fmt, vpu_dec_object->init_info.nPicWidth, \
         vpu_dec_object->init_info.nPicHeight, vpu_dec_object->input_state);
@@ -1370,9 +1369,10 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
 
     if (buf_ret & VPU_DEC_INIT_OK \
         || buf_ret & VPU_DEC_RESOLUTION_CHANGED) {
-      if (buf_ret & VPU_DEC_RESOLUTION_CHANGED)
+      if (buf_ret & VPU_DEC_RESOLUTION_CHANGED) {
         vpu_dec_object->vpu_report_resolution_change = TRUE; 
-      vpu_dec_object->vpu_need_reconfig = TRUE;
+        vpu_dec_object->vpu_need_reconfig = TRUE;
+      }
       ret = gst_vpu_dec_object_handle_reconfig(vpu_dec_object, bdec);
       /* workaround for VPU will discard decoded video frame when resolution change. */
       if (!IS_HANTRO() && !IS_AMPHION())
