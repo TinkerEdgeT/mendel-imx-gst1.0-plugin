@@ -61,7 +61,7 @@ enum
 #define DEFAULT_LOW_LATENCY FALSE
 #define DEFAULT_OUTPUT_FORMAT 0
 #define DEFAULT_ADAPTIVE_FRAME_DROP TRUE
-#define DEFAULT_FRAMES_PLUS 3
+#define DEFAULT_FRAMES_PLUS 0
 /* Default to use VPU memory for video frame buffer as all video frame buffer
  * must registe to VPU. Change video frame buffer will cause close VPU which
  * will cause video stream lost.
