@@ -25,7 +25,7 @@
 #include <gst/video/video.h>
 #include <gst/allocators/gstdmabuf.h>
 #include <gst/allocators/gstdmabufmeta.h>
-#include <libdrm/drm_fourcc.h>
+#include <libdrm/drm_fourcc_imx.h>
 #include <gst/allocators/gstallocatorphymem.h>
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>

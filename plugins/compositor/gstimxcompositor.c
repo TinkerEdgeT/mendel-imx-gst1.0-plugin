@@ -121,7 +121,7 @@
 
 #include <gst/allocators/gstdmabuf.h>
 #include <gst/allocators/gstdmabufmeta.h>
-#include <libdrm/drm_fourcc.h>
+#include <libdrm/drm_fourcc_imx.h>
 #include <gst/allocators/gstallocatorphymem.h>
 #include <gst/allocators/gstphymemmeta.h>
 #ifdef USE_ION

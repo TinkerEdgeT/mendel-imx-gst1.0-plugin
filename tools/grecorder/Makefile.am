@@ -12,7 +12,8 @@ librecorder_engine_@GST_API_VERSION@_la_LIBADD = $(GST_LIBS) $(GST_PLUGINS_BASE_
 bin_PROGRAMS = grecorder-@GST_API_VERSION@
 grecorder_@GST_API_VERSION@_SOURCES = grecorder.c
 grecorder_@GST_API_VERSION@_CFLAGS  = $(GST_CFLAGS) 
-grecorder_@GST_API_VERSION@_LDADD   = librecorder_engine-@GST_API_VERSION@.la
+grecorder_@GST_API_VERSION@_LDADD   = librecorder_engine-@GST_API_VERSION@.la \
+	-lglib-2.0
 
 opencv_haarcascadesdir = $(pkgdatadir)/$(GST_API_VERSION)/opencv_haarcascades
 opencv_haarcascades_DATA = haarcascade_frontalface_old_format.xml
