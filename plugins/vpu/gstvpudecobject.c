@@ -918,6 +918,11 @@ gst_vpu_dec_object_release_frame_buffer_to_vpu (GstVpuDecObject * vpu_dec_object
   vpu_dec_object->gstbuffer_in_vpudec = g_list_append ( \
       vpu_dec_object->gstbuffer_in_vpudec, buffer);
   frame_buffer = g_hash_table_lookup(vpu_dec_object->gstbuffer2frame_table, buffer);
+  if (!frame_buffer) {
+    GST_ERROR_OBJECT(vpu_dec_object, "buffer 0x%x not in gstbuffer2frame_table, "
+        "pool returned a newly allocated buffer which is not supported", buffer);
+    return FALSE;
+  }
   GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer_in_vpudec list length: %d\n", \
       g_list_length (vpu_dec_object->gstbuffer_in_vpudec));
 
