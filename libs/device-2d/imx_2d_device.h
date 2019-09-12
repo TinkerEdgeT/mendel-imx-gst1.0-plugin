@@ -1,5 +1,6 @@
 /* GStreamer IMX Video 2D Device Abstract
  * Copyright (c) 2014-2016, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2018 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -22,6 +23,7 @@
 
 #include <gst/video/video.h>
 #include "gstimxcommon.h"
+#include "gstimx.h"
 #include "imx_2d_device_allocator.h"
 
 #define ALIGNMENT (16)
@@ -45,6 +47,11 @@ typedef enum {
   IMX_2D_DEVICE_CAP_OVERLAY      = 0x40,
   IMX_2D_DEVICE_CAP_ALL          = 0x1F
 } Imx2DDeviceCap;
+
+typedef enum {
+  IMX_2D_TILE_NULL,
+  IMX_2D_TILE_AMHPION
+} Imx2DTileType;
 
 typedef enum {
   IMX_2D_ROTATION_0,
@@ -87,6 +94,7 @@ typedef struct _Imx2DVideoInfo {
   guint w;
   guint h;
   guint stride;
+  Imx2DTileType tile_type;
 } Imx2DVideoInfo;
 
 typedef struct _Imx2DFrame {

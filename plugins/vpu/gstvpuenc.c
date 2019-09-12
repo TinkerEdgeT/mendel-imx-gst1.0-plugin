@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2018 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -39,12 +40,17 @@
 #include <gst/video/video.h>
 #include <gst/video/gstvideometa.h>
 #include <gst/video/gstvideopool.h>
+#include <gst/allocators/gstdmabuf.h>
 #include "gstimxcommon.h"
 #include "gstvpuallocator.h"
 #include "gstvpuenc.h"
 
 #define DEFAULT_BITRATE 0
+#ifdef USE_H1_ENC
+#define DEFAULT_GOP_SIZE 30
+#else
 #define DEFAULT_GOP_SIZE 15
+#endif
 #define DEFAULT_QUANT -1
 #define DEFAULT_H264_QUANT 35
 #define DEFAULT_MPEG4_QUANT 15
@@ -61,24 +67,31 @@ typedef struct _VpuEncInfo {
 static const VpuEncInfo VpuEncInfos[] = {
   { .name                     = "h264",
     .std                      = VPU_V_AVC,
-    .description              = "VPU-based AVC/H264 video encoder",
+    .description              = "IMX VPU-based AVC/H264 video encoder",
     .detail                   = "Encode raw data to compressed video",
   },
   { .name                     = "mpeg4",
     .std                      = VPU_V_MPEG4,
-    .description              = "VPU-based MPEG4 video encoder",
+    .description              = "IMX VPU-based MPEG4 video encoder",
     .detail                   = "Encode raw data to compressed video",
   },
   { .name                     = "h263",
     .std                      = VPU_V_H263,
-    .description              = "VPU-based H263 video encoder",
+    .description              = "IMX VPU-based H263 video encoder",
     .detail                   = "Encode raw data to compressed video",
   },
   { .name                     = "jpeg",
     .std                      = VPU_V_MJPG,
-    .description              = "VPU-based JPEG video encoder",
+    .description              = "IMX VPU-based JPEG video encoder",
     .detail                   = "Encode raw data to compressed video",
   },
+#ifdef USE_H1_ENC
+  { .name                     = "vp8",
+    .std                      = VPU_V_VP8,
+    .description              = "IMX VPU-based VP8 video encoder",
+    .detail                   = "Encode raw data to compressed video",
+  },
+#endif
   {
     NULL
   }
@@ -98,7 +111,11 @@ static GstStaticPadTemplate static_sink_template = GST_STATIC_PAD_TEMPLATE(
 	GST_PAD_ALWAYS,
 	GST_STATIC_CAPS(
 		"video/x-raw,"
-		"format = (string) { NV12, I420, YV12 }, "
+#ifdef USE_H1_ENC
+		"format = (string) { NV12, I420, YUY2, UYVY, RGBA, RGBx, RGB16, RGB15, BGRA, BGRx, BGR16 }, "
+#else
+        "format = (string) { NV12, I420, YV12 }, "
+#endif
 		"width = (int) [ 64, 1920, 8 ], "
 		"height = (int) [ 64, 1088, 8 ], "
 		"framerate = (fraction) [ 0, MAX ]"
@@ -155,6 +172,21 @@ static GstStaticPadTemplate static_src_template_h263 = GST_STATIC_PAD_TEMPLATE(
 		"framerate = (fraction) [ 0, MAX ]; "
 	)
 );
+
+#ifdef USE_H1_ENC
+static GstStaticPadTemplate static_src_template_vp8 = GST_STATIC_PAD_TEMPLATE(
+    "src",
+    GST_PAD_SRC,
+    GST_PAD_ALWAYS,
+    GST_STATIC_CAPS(
+        "video/x-vp8, "
+        "variant = (string) itu, "
+        "width = (int) [ 64, 1920, 8 ], "
+        "height = (int) [ 64, 1088, 8 ], "
+        "framerate = (fraction) [ 0, MAX ]; "
+    )
+);
+#endif
 
 static GstStaticPadTemplate static_src_template_jpeg = GST_STATIC_PAD_TEMPLATE(
 	"src",
@@ -220,13 +252,18 @@ gst_vpu_enc_class_init (GstVpuEncClass * klass)
   } else if (in_plugin->std == VPU_V_MPEG4) {
     g_object_class_install_property (gobject_class, PROP_QUANT,
         g_param_spec_int ("quant", "quant",
-          "set quant value: Mpeg4(1-31) (-1 for automatic)", 
+          "set quant value: Mpeg4(1-31) (-1 for automatic)",
           -1, 31, DEFAULT_QUANT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   } else if (in_plugin->std == VPU_V_H263) {
     g_object_class_install_property (gobject_class, PROP_QUANT,
         g_param_spec_int ("quant", "quant",
           "set quant value: H.263(1-31) (-1 for automatic)", 
           -1, 31, DEFAULT_QUANT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  } else if (in_plugin->std == VPU_V_VP8) {
+    g_object_class_install_property (gobject_class, PROP_QUANT,
+      g_param_spec_int ("quant", "quant",
+        "set quant value: VP8(1-31) (-1 for automatic)",
+        -1, 31, DEFAULT_QUANT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   }
 
   if (in_plugin->std == VPU_V_AVC) {
@@ -250,6 +287,14 @@ gst_vpu_enc_class_init (GstVpuEncClass * klass)
     gst_element_class_add_pad_template (element_class,
         gst_static_pad_template_get (&static_src_template_jpeg));
   }
+#ifdef USE_H1_ENC
+  else if (in_plugin->std == VPU_V_VP8) {
+    gst_element_class_add_pad_template (element_class,
+        gst_static_pad_template_get (&static_sink_template));
+    gst_element_class_add_pad_template (element_class,
+        gst_static_pad_template_get (&static_src_template_vp8));
+  }
+#endif
 
   gst_element_class_set_static_metadata (element_class,
       in_plugin->description, "Codec/Encoder/Video",
@@ -419,6 +464,9 @@ gst_vpu_enc_start (GstVideoEncoder * benc)
     return FALSE;
   }
 
+  enc->total_frames = 0;
+  enc->total_time = 0;
+
   return TRUE;
 }
 
@@ -461,6 +509,9 @@ static gboolean
 gst_vpu_enc_stop (GstVideoEncoder * benc)
 {
   GstVpuEnc *enc = (GstVpuEnc *) benc;
+
+  GST_INFO_OBJECT(enc, "Video encoder frames: %lld time: %lld fps: (%.3f).\n",
+      enc->total_frames, enc->total_time, (gfloat)1000000 * enc->total_frames / enc->total_time);
 
   if (!gst_vpu_enc_reset (enc)) {
     GST_ERROR_OBJECT(enc, "gst_enc_free_output_buffer fail");
@@ -582,6 +633,10 @@ gst_vpu_enc_decide_output_video_format (GstVideoEncoder * benc)
   if (!g_strcmp0(video_format_str, "avc"))
     enc->open_param.nIsAvcc = 1;
 
+  // hantro vpu wrapper only output bytestream
+  if (IS_HANTRO())
+      enc->open_param.nIsAvcc = 0;
+
   gst_caps_unref(caps);
 
   return TRUE;
@@ -675,8 +730,28 @@ gst_vpu_enc_set_format (GstVideoEncoder * benc, GstVideoCodecState * state)
   s = gst_caps_get_structure(state->caps, 0);
   video_format_str = gst_structure_get_string(s, "format");
 
-  if (video_format_str && !g_strcmp0(video_format_str, "NV12"))
-    enc->open_param.nChromaInterleave = 1;
+  if (video_format_str) {
+    if (!g_strcmp0(video_format_str, "NV12")) {
+      enc->open_param.nChromaInterleave = 1;
+      enc->open_param.eColorFormat = VPU_COLOR_420;
+    } else if (!g_strcmp0(video_format_str, "YUY2")) {
+      enc->open_param.nChromaInterleave = 1;
+      enc->open_param.eColorFormat = VPU_COLOR_422YUYV;
+    } else if (!g_strcmp0(video_format_str, "UYVY")) {
+      enc->open_param.nChromaInterleave = 1;
+      enc->open_param.eColorFormat = VPU_COLOR_422UYVY;
+    } else if (!g_strcmp0(video_format_str, "RGBA") || !g_strcmp0(video_format_str, "RGBx")) {
+      enc->open_param.eColorFormat = VPU_COLOR_ARGB8888;
+    } else if (!g_strcmp0(video_format_str, "BGRA") || !g_strcmp0(video_format_str, "BGRx")) {
+      enc->open_param.eColorFormat = VPU_COLOR_BGRA8888;
+    }else if (!g_strcmp0(video_format_str, "RGB16")) {
+      enc->open_param.eColorFormat = VPU_COLOR_RGB565;
+    } else if (!g_strcmp0(video_format_str, "RGB15")) {
+      enc->open_param.eColorFormat = VPU_COLOR_RGB555;
+    } else if (!g_strcmp0(video_format_str, "BGR16")) {
+      enc->open_param.eColorFormat = VPU_COLOR_BGR565;
+    }
+  }
 
 	GST_INFO_OBJECT(enc, "setting bitrate to %u kbps and GOP size to %u", \
       enc->open_param.nBitRate, enc->open_param.nGOPSize);
@@ -730,6 +805,7 @@ gst_vpu_enc_setup_internal_bufferpool (GstVpuEnc * enc)
   GstCaps *caps;
   GstStructure *config;
   guint i;
+  guint alignH, alignV;
 
   enc->pool = gst_video_buffer_pool_new ();
   if (!enc->pool) {
@@ -745,15 +821,21 @@ gst_vpu_enc_setup_internal_bufferpool (GstVpuEnc * enc)
 
   params.align = enc->init_info.nAddressAlignment;
   memset(&(enc->video_align), 0, sizeof(GstVideoAlignment));
-  if (enc->open_param.nPicWidth % DEFAULT_FRAME_BUFFER_ALIGNMENT_H)
-    enc->video_align.padding_right = DEFAULT_FRAME_BUFFER_ALIGNMENT_H \
-      - enc->open_param.nPicWidth % DEFAULT_FRAME_BUFFER_ALIGNMENT_H;
-  if (enc->open_param.nPicHeight % DEFAULT_FRAME_BUFFER_ALIGNMENT_V)
-    enc->video_align.padding_bottom = DEFAULT_FRAME_BUFFER_ALIGNMENT_V\
-      - enc->open_param.nPicHeight % DEFAULT_FRAME_BUFFER_ALIGNMENT_V;
+
+  if (IS_HANTRO()) {
+    alignH = DEFAULT_FRAME_BUFFER_ALIGNMENT_H_HANTRO;
+    alignV = DEFAULT_FRAME_BUFFER_ALIGNMENT_V_HANTRO;
+  } else {
+    alignH = DEFAULT_FRAME_BUFFER_ALIGNMENT_H;
+    alignV = DEFAULT_FRAME_BUFFER_ALIGNMENT_V;
+  }
+  if (enc->open_param.nPicWidth % alignH)
+    enc->video_align.padding_right = alignH - enc->open_param.nPicWidth % alignH;
+  if (enc->open_param.nPicHeight % alignV)
+    enc->video_align.padding_bottom = alignV - enc->open_param.nPicHeight % alignV;
 
   for (i = 0; i < GST_VIDEO_MAX_PLANES; i++)
-    enc->video_align.stride_align[i] = DEFAULT_FRAME_BUFFER_ALIGNMENT_H - 1;
+    enc->video_align.stride_align[i] = alignH - 1;
 
   config = gst_buffer_pool_get_config(enc->pool);
   gst_buffer_pool_config_add_option(config, GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
@@ -867,7 +949,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
     }
   }
 
-  if (!gst_buffer_is_phymem (frame->input_buffer)) {
+  if (!(gst_buffer_is_phymem (frame->input_buffer) || gst_is_dmabuf_memory (gst_buffer_peek_memory(frame->input_buffer, 0)))) {
     GstVideoInfo info = enc->state->info;
     GstVideoFrame frame1, frame2;
 
@@ -894,10 +976,10 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
     gst_video_frame_unmap (&frame2);
 
     input_buffer = pool_buffer;
-	} else {
+  } else {
     GST_DEBUG_OBJECT(enc, "is physical continues memory.");
     input_buffer = frame->input_buffer;
-	}
+  }
 
 	/* Set up physical addresses for the input framebuffer */
 	{
@@ -919,14 +1001,25 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 			plane_strides = enc->state->info.stride;
 		}
 
-    input_phys_buffer = gst_buffer_query_phymem_block (input_buffer);
-		if (input_phys_buffer == NULL) {
-      GST_ERROR_OBJECT(enc, "could not get physical address from input buffer.");
-      ret = GST_FLOW_ERROR;
-      goto bail;
-    }
-
-		phys_ptr = (unsigned char*)(input_phys_buffer->paddr);
+        if (gst_is_dmabuf_memory (gst_buffer_peek_memory (frame->input_buffer, 0))) {
+          guint i, n_mem;
+          gint fd[4];
+          memset (fd, -1, sizeof(gint) * 4);
+          n_mem = gst_buffer_n_memory (frame->input_buffer);
+          for (i = 0; i < n_mem; i++) {
+            fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (frame->input_buffer, i));
+          }
+          if (fd[0] >= 0)
+            phys_ptr = phy_addr_from_fd (fd[0]);
+        } else {
+          input_phys_buffer = gst_buffer_query_phymem_block (input_buffer);
+          if (input_phys_buffer == NULL) {
+            GST_ERROR_OBJECT(enc, "could not get physical address from input buffer.");
+            ret = GST_FLOW_ERROR;
+            goto bail;
+          }
+          phys_ptr = (unsigned char*)(input_phys_buffer->paddr);
+        }
 
 		input_framebuf.pbufY = phys_ptr;
 		input_framebuf.pbufCb = phys_ptr + plane_offsets[1];
@@ -942,7 +1035,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 	}
 
   // Allocate needed physical buffer.
-  if (!gst_vpu_enc_allocate_physical_mem (enc, src_stride)) {
+  if (enc->init_info.nMinFrameBufferCount > 0 && (!gst_vpu_enc_allocate_physical_mem (enc, src_stride))) {
     GST_ERROR_OBJECT(enc, "gst_vpu_enc_allocate_physical_mem failed.");
     ret = GST_FLOW_ERROR;
     goto bail;
@@ -960,7 +1053,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
   gst_buffer_map (output_buffer, &minfo, GST_MAP_READ);
 
 	/* Set up encoding parameters */
-	enc_enc_param.nInVirtOutput = (unsigned int)(minfo.data);
+	enc_enc_param.nInVirtOutput = (unsigned long)(minfo.data);
 	enc_enc_param.nInOutputBufLen = enc->state->info.size;
 	enc_enc_param.nPicWidth = enc->open_param.nPicWidth;
 	enc_enc_param.nPicHeight = enc->open_param.nPicHeight;
@@ -1016,6 +1109,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
         goto bail;
       }
 
+      enc->total_time += g_get_monotonic_time () - start_time;
       GST_DEBUG_OBJECT(enc, "encoder consume time: %lld\n", \
           g_get_monotonic_time () - start_time);
 
@@ -1029,7 +1123,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 
         if (!(enc->open_param.eFormat == VPU_V_AVC && enc->open_param.nIsAvcc == 1)) {
           output_buffer_offset += enc_enc_param.nOutOutputSize;
-          enc_enc_param.nInVirtOutput = (unsigned int)(minfo.data) + enc_enc_param.nOutOutputSize;
+          enc_enc_param.nInVirtOutput = (unsigned long)(minfo.data) + enc_enc_param.nOutOutputSize;
           enc_enc_param.nInOutputBufLen = enc->state->info.size - enc_enc_param.nOutOutputSize;
         }
 
@@ -1046,6 +1140,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
           GST_LOG_OBJECT(enc, "setting sync point");
           GST_VIDEO_CODEC_FRAME_SET_SYNC_POINT(frame);
         }
+        enc->total_frames ++;
         enc->gop_count ++;
         output_buffer_offset += enc_enc_param.nOutOutputSize;
 
@@ -1153,6 +1248,18 @@ gboolean gst_vpu_enc_register (GstPlugin * plugin)
   const VpuEncInfo *in_plugin = gst_vpu_enc_get_info();
 
   while (in_plugin->name) {
+#ifdef USE_H1_ENC
+    if (g_strcmp0 (in_plugin->name, "h264") && g_strcmp0 (in_plugin->name, "vp8")) {
+      in_plugin++;
+      continue;
+    }
+#else
+    if (!g_strcmp0 (in_plugin->name, "vp8")) {
+      in_plugin++;
+      continue;
+    }
+#endif
+
     t_name = g_strdup_printf ("vpuenc_%s", in_plugin->name);
     type = g_type_from_name (t_name);
 

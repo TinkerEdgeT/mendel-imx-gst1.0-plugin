@@ -16,6 +16,7 @@
 
 /*
  * Copyright (c) 2011-2014, Freescale Semiconductor, Inc. All rights reserved. 
+ * Copyright 2018 NXP
  *
  */
 
@@ -50,5 +51,5 @@ plugin_init (GstPlugin * plugin)
   return TRUE;
 }
 
-IMX_GST_PLUGIN_DEFINE (beep, "universal audio decoder", plugin_init);
+IMX_GST_PLUGIN_DEFINE (beepdec, "universal audio decoder", plugin_init);
 

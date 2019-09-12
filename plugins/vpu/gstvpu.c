@@ -68,9 +68,6 @@ gst_vpu_allocate_internal_mem (VpuInternalMem * vpu_internal_mem)
 	for (i = 0; i < vpu_internal_mem->mem_info.nSubBlockNum; ++i) {
 		size = vpu_internal_mem->mem_info.MemSubBlock[i].nAlignment \
            + vpu_internal_mem->mem_info.MemSubBlock[i].nSize;
-		GST_DEBUG_OBJECT(vpu_internal_mem, "sub block %d  type: %s  size: %d", i, \
-        (vpu_internal_mem->mem_info.MemSubBlock[i].MemType == VPU_MEM_VIRT) ? \
-        "virtual" : "phys", size);
  
 		if (vpu_internal_mem->mem_info.MemSubBlock[i].MemType == VPU_MEM_VIRT) {
       ptr = g_malloc(size);
@@ -152,9 +149,9 @@ gst_vpu_register_frame_buffer (GList * gstbuffer_in_vpudec, \
     vpu_frame->pbufCr = vpu_frame->pbufCb + \
       (GST_VIDEO_FRAME_COMP_DATA (&frame, 2) - GST_VIDEO_FRAME_COMP_DATA (&frame, 1));
 
-    vpu_frame->pbufVirtY = GST_VIDEO_FRAME_COMP_DATA (&frame, 0);
-    vpu_frame->pbufVirtCb = GST_VIDEO_FRAME_COMP_DATA (&frame, 1);
-    vpu_frame->pbufVirtCr = GST_VIDEO_FRAME_COMP_DATA (&frame, 2);
+    vpu_frame->pbufVirtY = GST_VIDEO_FRAME_PLANE_DATA (&frame, 0);
+    vpu_frame->pbufVirtCb = GST_VIDEO_FRAME_PLANE_DATA (&frame, 1);
+    vpu_frame->pbufVirtCr = GST_VIDEO_FRAME_PLANE_DATA (&frame, 2);
 
     gst_video_frame_unmap (&frame);
   }

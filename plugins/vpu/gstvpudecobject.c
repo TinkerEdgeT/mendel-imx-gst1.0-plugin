@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013, Freescale Semiconductor, Inc. All rights reserved.
- * Copyright 2017 NXP
+ * Copyright 2017-2018 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -141,6 +141,11 @@ gst_vpu_dec_object_get_sink_caps (void)
               || map->std == VPU_V_MJPG || map->std == VPU_V_VC1_AP)) {
           map++;
           continue;
+        }
+        if (IS_IMX8MM() && (map->std != VPU_V_HEVC && map->std != VPU_V_VP9
+                    && map->std != VPU_V_AVC && map->std != VPU_V_VP8)) {
+            map++;
+            continue;
         }
         if (caps) {
           GstCaps *newcaps = gst_caps_from_string (map->mime);
@@ -523,6 +528,8 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
         || open_param->CodecFormat == VPU_V_AVC))
       || IS_AMPHION()) {
     open_param->nTiled2LinearEnable = 1;
+    if (IS_IMX8MM())
+        open_param->nTiled2LinearEnable = 0;
     vpu_dec_object->implement_config = TRUE;
     if (open_param->CodecFormat == VPU_V_HEVC
         || open_param->CodecFormat == VPU_V_VP9)
@@ -533,6 +540,10 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
     open_param->nTiled2LinearEnable = 0;
   }
   open_param->nEnableVideoCompressor = 1;
+  if (IS_IMX8MM()) {
+    open_param->nEnableVideoCompressor = 0;
+    open_param->nPixelFormat = 1;
+  }
   vpu_dec_object->output_format_decided = GST_VIDEO_FORMAT_NV12;
   if (open_param->CodecFormat == VPU_V_MJPG) {
     vpu_dec_object->is_mjpeg = TRUE;
@@ -556,6 +567,7 @@ gst_vpu_dec_object_set_vpu_param (GstVpuDecObject * vpu_dec_object, \
     open_param->nChromaInterleave = 1;
     vpu_dec_object->chroma_interleaved = TRUE;
   }
+  open_param->nAdaptiveMode = 1;
   open_param->nReorderEnable = 1;
   open_param->nEnableFileMode = 0;
   open_param->nPicWidth = GST_VIDEO_INFO_WIDTH(info);
@@ -632,6 +644,8 @@ gst_vpu_dec_object_config (GstVpuDecObject * vpu_dec_object, \
 
   if (vpu_dec_object->vpu_report_resolution_change == FALSE \
       && vpu_dec_object->state >= STATE_REGISTRIED_FRAME_BUFFER) {
+    /* drain output */
+    gst_vpu_dec_object_decode (vpu_dec_object, bdec, NULL);
     dec_ret = VPU_DecClose(vpu_dec_object->handle);
     if (dec_ret != VPU_DEC_RET_SUCCESS) {
       GST_ERROR_OBJECT(vpu_dec_object, "closing decoder failed: %s", \
@@ -878,7 +892,12 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   if (IS_HANTRO() && vpu_dec_object->implement_config) {
     VpuBufferNode in_data = {0};
     int buf_ret;
-    VPU_DecDecodeBuf(vpu_dec_object->handle, &in_data, &buf_ret);
+    dec_ret = VPU_DecDecodeBuf(vpu_dec_object->handle, &in_data, &buf_ret);
+    if (dec_ret == VPU_DEC_RET_FAILURE) {
+      GST_ERROR_OBJECT(vpu_dec_object, "VPU_DecDecodeBuf fail: %s", \
+          gst_vpu_dec_object_strerror(dec_ret));
+      return GST_FLOW_ERROR;
+    }
   }
 
   if (!gst_vpu_dec_object_register_frame_buffer (vpu_dec_object, bdec)) {
@@ -899,6 +918,11 @@ gst_vpu_dec_object_release_frame_buffer_to_vpu (GstVpuDecObject * vpu_dec_object
   vpu_dec_object->gstbuffer_in_vpudec = g_list_append ( \
       vpu_dec_object->gstbuffer_in_vpudec, buffer);
   frame_buffer = g_hash_table_lookup(vpu_dec_object->gstbuffer2frame_table, buffer);
+  if (!frame_buffer) {
+    GST_ERROR_OBJECT(vpu_dec_object, "buffer 0x%x not in gstbuffer2frame_table, "
+        "pool returned a newly allocated buffer which is not supported", buffer);
+    return FALSE;
+  }
   GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer_in_vpudec list length: %d\n", \
       g_list_length (vpu_dec_object->gstbuffer_in_vpudec));
 
@@ -1120,7 +1144,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
     pmeta->rfc_chroma_offset = out_frame_info.pExtInfo->rfc_chroma_offset;
   }
   
-  if (vpu_dec_object->init_info.hasHdr10Meta) {
+  if (vpu_dec_object->init_info.hasHdr10Meta || vpu_dec_object->init_info.hasColorDesc) {
     GstVideoHdr10Meta *meta = gst_buffer_add_video_hdr10_meta (out_frame->output_buffer);
     meta->hdr10meta.redPrimary[0] = vpu_dec_object->init_info.Hdr10Meta.redPrimary[0];
     meta->hdr10meta.redPrimary[1] = vpu_dec_object->init_info.Hdr10Meta.redPrimary[1];

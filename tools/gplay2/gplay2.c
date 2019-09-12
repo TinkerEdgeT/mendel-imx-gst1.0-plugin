@@ -1,6 +1,6 @@
 /*
  * Copyright 2014-2016 Freescale Semiconductor, Inc.
- * Copyright 2017 NXP
+ * Copyright 2017-2019 NXP
  *
  */
 
@@ -35,11 +35,11 @@
 #include <signal.h>
 #include <unistd.h>
 #include <errno.h>
+#include <gstimxcommon.h>
 
 #include <gst/player/player.h>
 
 #include "playlist.h"
-#include "../../libs/gstimxcommon.h"
 
 #include <fcntl.h>
 #include <linux/fb.h>
@@ -805,6 +805,8 @@ gplay_checkfeature (CHIP_FEATURE type)
       ret = FALSE;
       break;
   }
+
+  return ret;
 }
 
 
@@ -863,6 +865,11 @@ error_cb (GstPlayer * player, GError * err, GstPlayData * play)
     gexit_input_thread = TRUE;
     gexit_display_thread = TRUE;
   }
+  if (gexit_input_thread == TRUE ) {
+    if (g_main_loop_is_running (gloop) == TRUE) {
+      g_main_loop_quit (gloop);
+    }
+  }
 }
 
 static void
@@ -891,6 +898,11 @@ eos_cb (GstPlayer * player, GstPlayData * play)
     g_print ("no auto next is on\n");
     gexit_input_thread = TRUE;
     gexit_display_thread = TRUE;
+  }
+  if (gexit_input_thread == TRUE ) {
+    if (g_main_loop_is_running (gloop) == TRUE) {
+      g_main_loop_quit (gloop);
+    }
   }
 }
 
@@ -1081,6 +1093,18 @@ input_thread_fun (gpointer data)
       case 'c':                // playing direction and speed Control.
       {
         gdouble playback_rate;
+        gboolean seekable = FALSE;
+        GstPlayerMediaInfo *media_info = gst_player_get_media_info (player);
+
+        gDisable_display = TRUE;
+        seekable = gst_player_media_info_is_seekable (media_info);
+        g_object_unref (media_info);
+
+        if (!seekable) {
+          g_print ("file is not seekable!, rate can not be set! \n");
+          gDisable_display = FALSE;
+          break;
+        }
         g_print ("Set playing speed[-8,-4,-2,0.125,0.25,0.5,1,2,4,8]:");
         gDisable_display = TRUE;
         if (scanf ("%lf", &playback_rate) != 1) {
@@ -1088,13 +1112,13 @@ input_thread_fun (gpointer data)
           break;
         }
         gDisable_display = FALSE;
+        gst_player_set_rate (player, playback_rate);
+        wait_for_seek_done (play, options->timeout);
         if (playback_rate > 2.0 || playback_rate < 0){
           gst_player_set_subtitle_track_enabled (player, FALSE);
         } else {
           gst_player_set_subtitle_track_enabled (player, TRUE);
         }
-        gst_player_set_rate (player, playback_rate);
-        wait_for_seek_done (play, options->timeout);
         if (playback_rate > 0 && playback_rate <= 2.0){
           /* now do pending track select */
           if (play->pending_audio_track >= 0) {
@@ -1512,26 +1536,25 @@ main (int argc, char *argv[])
     options.timeout = DEFAULT_TIME_OUT;
   }
 
-  if (!options.video_sink_name)
-    if (gplay_checkfeature (G2D)) {
-      options.video_sink_name = "overlaysink";
-      if (gplay_checkfeature (DPU)) {
-        if (gplay_checkfeature (VPU)) 
-          options.video_sink_name = "kmssink";
-        else
-          options.video_sink_name = "glimagesink";
-      }
-    } else {
-      options.video_sink_name = "imxv4l2sink";
-      if (gplay_checkfeature (DCSS))
-        options.video_sink_name = "kmssink";
-    }
-  g_print ("Set VideoSink %s \n", options.video_sink_name);
-  video_sink =
+  if (!options.video_sink_name) {
+    if (gplay_checkfeature (VPU) && gplay_checkfeature (DPU)) {
+      options.video_sink_name = "imxvideoconvert_g2d ! queue ! waylandsink";
+      g_print ("Set VideoSink %s \n", options.video_sink_name);
+      video_sink =
+        gst_parse_bin_from_description (options.video_sink_name, TRUE, NULL);
+      VideoRender =
+        gst_player_video_overlay_video_renderer_new_with_sink (NULL, video_sink);
+    } else
+      VideoRender =
+        gst_player_video_overlay_video_renderer_new (NULL);
+  } else {
+    g_print ("Set VideoSink %s \n", options.video_sink_name);
+    video_sink =
       gst_parse_bin_from_description (options.video_sink_name, TRUE, NULL);
-
-  VideoRender =
+    VideoRender =
       gst_player_video_overlay_video_renderer_new_with_sink (NULL, video_sink);
+  }
+
   VideoOverlayVideoRenderer =
       GST_PLAYER_VIDEO_OVERLAY_VIDEO_RENDERER (VideoRender);
 

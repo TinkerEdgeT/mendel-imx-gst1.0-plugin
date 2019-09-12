@@ -1,5 +1,6 @@
 /* Process video overlay composition meta by IMX 2D devices
  * Copyright (c) 2015-2016, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2018 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -602,6 +603,10 @@ gint imx_video_overlay_composition_composite(
       }
 
       dst.mem = out_v->mem;
+      dst.fd[0] = out_v->fd[0];
+      dst.fd[1] = out_v->fd[1];
+      dst.fd[2] = out_v->fd[2];
+      dst.fd[3] = out_v->fd[3];
       dst.info.fmt = out_v->fmt;
       dst.alpha = 0xFF;
       dst.rotate = out_v->rotate;

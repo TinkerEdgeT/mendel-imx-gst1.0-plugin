@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2015, Freescale Semiconductor, Inc. All rights reserved.
- * Copyright 2017 NXP
+ * Copyright 2017-2018 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -149,7 +149,7 @@ gst_vpu_dec_class_init (GstVpuDecClass * klass)
           gst_pad_template_new ("src", GST_PAD_SRC, GST_PAD_ALWAYS,
           gst_vpu_dec_object_get_src_caps ()));
   gst_element_class_set_static_metadata (element_class,
-      "VPU-based video decoder", "Codec/Decoder/Video",
+      "IMX VPU-based video decoder", "Codec/Decoder/Video",
       "Decode compressed video to raw data",
       IMX_GST_PLUGIN_AUTHOR);
 

@@ -3,7 +3,7 @@ AC_PREREQ(2.59)
 dnl initialize autoconf
 dnl releases only do -Wall, git and prerelease does -Werror too
 dnl use a three digit version number for releases, and four for git/prerelease
-AC_INIT(GStreamer i.MX Plug-ins, 4.3.4, http://www.freescale.com, imx-gst1.0-plugin)
+AC_INIT(GStreamer i.MX Plug-ins, 4.4.5, http://www.freescale.com, imx-gst1.0-plugin)
 
 dnl initialize automake
 AM_INIT_AUTOMAKE([foreign])
@@ -191,7 +191,7 @@ PKG_CHECK_MODULES(GST_BAD_BASE, gstreamer-bad-base-$GST_MAJORMINOR >= $GST_REQUI
 
 dnl Give a warning if we don't have gstreamer libs
 if test "x$HAVE_GST_BAD_BASE" = "xno"; then
-  AC_MSG_ERROR(no GStreamer bad-base found)
+  AC_MSG_WARN(no GStreamer bad-base found)
 fi
 
 dnl make GST_BAD_BASE_CFLAGS and GST_BAD_BASE_LIBS available
@@ -214,7 +214,8 @@ fi
 
 dnl check ion allocator headfile
 old_CFLAGS=$CFLAGS
-CFLAGS="$CFLAGS `$PKG_CONFIG --cflags gstreamer-bad-allocators-1.0`"
+PKG_CHECK_MODULES(GST, gstreamer-$GST_MAJORMINOR >= 1.14, CFLAGS="$CFLAGS `$PKG_CONFIG --cflags gstreamer-allocators-1.0`",\
+                  CFLAGS="$CFLAGS `$PKG_CONFIG --cflags gstreamer-bad-allocators-1.0`")
 AC_CHECK_HEADERS([linux/ion.h gst/allocators/gstionmemory.h], HAVE_ION="yes", HAVE_ION="no")
 AM_CONDITIONAL(USE_ION, test "x$HAVE_ION" = "xyes")
 CFLAGS=$old_CFLAGS
@@ -223,12 +224,18 @@ HAVE_BAD_ALLOCATOR=no
 AC_CHECK_LIB(gstbadallocators-$GST_MAJORMINOR, gst_buffer_is_phymem, [HAVE_BAD_ALLOCATOR=yes])
 AM_CONDITIONAL(USE_BAD_ALLOCATOR, test "x$HAVE_BAD_ALLOCATOR" = "xyes")
 
+PKG_CHECK_MODULES(GST, gstreamer-$GST_MAJORMINOR >= 1.14, HAVE_BAD_BASE=no, HAVE_BAD_BASE=yes)
+AM_CONDITIONAL(USE_BAD_BASE, test "x$HAVE_BAD_BASE" = "xyes")
+
+AC_CHECK_HEADERS([hantro_enc/ewl.h], [HAVE_H1_ENC=yes], [HAVE_H1_ENC=no])
+AM_CONDITIONAL(USE_H1_ENC, test "x$HAVE_H1_ENC" = "xyes")
+
 AC_CHECK_HEADERS([vpu_lib.h], [HAVE_VPU_LIB=yes], [HAVE_VPU_LIB=no])
 if test "x$HAVE_VPU_LIB" = "xyes"; then
     VPU_LIBS=`$PKG_CONFIG --libs libfslvpuwrap 2>/dev/null`
     VPU_LIBS+=" -lvpu"
 fi
-AC_CHECK_HEADERS([codec.h dwl.h], [HAVE_VPU_LIB=yes], [HAVE_VPU_LIB=no])
+AC_CHECK_HEADERS([hantro_dec/dwl.h], [HAVE_VPU_LIB=yes], [HAVE_VPU_LIB=no])
 if test "x$HAVE_VPU_LIB" = "xyes"; then
     VPU_LIBS=`$PKG_CONFIG --libs libfslvpuwrap 2>/dev/null`
 fi

@@ -1,5 +1,6 @@
 /* GStreamer IMX video compositor plugin
  * Copyright (c) 2015-2016, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2018 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -119,6 +120,8 @@
 #include <string.h>
 
 #include <gst/allocators/gstdmabuf.h>
+#include <gst/allocators/gstdmabufmeta.h>
+#include <libdrm/drm_fourcc_imx.h>
 #include <gst/allocators/gstallocatorphymem.h>
 #include <gst/allocators/gstphymemmeta.h>
 #ifdef USE_ION
@@ -1036,6 +1039,8 @@ gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps,
         1, G_MAXINT32, G_MAXINT32, 1, NULL);
   }
 
+  vagg->info = info;
+
   return ret;
 }
 
@@ -1143,6 +1148,8 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
 {
   GstVideoAggregatorPad *ppad = (GstVideoAggregatorPad *)pad;
   guint i, n_mem;
+  GstDmabufMeta *dmabuf_meta;
+  gint64 drm_modifier = 0;
 
   src->info.fmt = GST_VIDEO_INFO_FORMAT(&(ppad->aggregated_frame->info));
   src->info.w = ppad->aggregated_frame->info.width +
@@ -1150,6 +1157,17 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
   src->info.h = ppad->aggregated_frame->info.height +
                 pad->align.padding_top + pad->align.padding_bottom;
   src->info.stride = ppad->aggregated_frame->info.stride[0];
+
+  dmabuf_meta = gst_buffer_get_dmabuf_meta (ppad->aggregated_frame->buffer);
+  if (dmabuf_meta)
+    drm_modifier = dmabuf_meta->drm_modifier;
+
+  GST_INFO_OBJECT (pad, "buffer modifier type %d", drm_modifier);
+
+  if (drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED)
+    src->info.tile_type = IMX_2D_TILE_AMHPION;
+  else
+    src->info.tile_type = IMX_2D_TILE_NULL;
 
   GST_LOG_OBJECT (pad, "Input: %s, %dx%d(%d), crop(%d,%d,%d,%d)",
       GST_VIDEO_FORMAT_INFO_NAME(ppad->aggregated_frame->info.finfo),
@@ -1600,8 +1618,13 @@ gst_imxcompositor_class_init (GstImxCompositorClass * klass)
     GST_ERROR ("Couldn't create caps for device '%s'", in_plugin->name);
     caps = gst_caps_new_empty_simple ("video/x-raw");
   }
+#if GST_CHECK_VERSION(1, 14, 0)
+   gst_element_class_add_pad_template (gstelement_class,
+      gst_pad_template_new_with_gtype ("sink_%u", GST_PAD_SINK, GST_PAD_REQUEST, caps, GST_TYPE_IMXCOMPOSITOR_PAD));
+#else
   gst_element_class_add_pad_template (gstelement_class,
       gst_pad_template_new ("sink_%u", GST_PAD_SINK, GST_PAD_REQUEST, caps));
+#endif
 
   list = dev->get_supported_out_fmts(dev);
   caps = imx_compositor_caps_from_fmt_list(list);
@@ -1611,20 +1634,26 @@ gst_imxcompositor_class_init (GstImxCompositorClass * klass)
     GST_ERROR ("Couldn't create caps for device '%s'", in_plugin->name);
     caps = gst_caps_new_empty_simple ("video/x-raw");
   }
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_pad_template_new ("src", GST_PAD_SRC, GST_PAD_ALWAYS, caps));
 
   klass->in_plugin = in_plugin;
   in_plugin->destroy(dev);
 
+#if GST_CHECK_VERSION(1, 14, 0)
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_pad_template_new_with_gtype ("src", GST_PAD_SRC, GST_PAD_ALWAYS, caps, GST_TYPE_AGGREGATOR_PAD));
+  agg_class->negotiated_src_caps = gst_imxcompositor_negotiated_caps;
+#else
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_pad_template_new ("src", GST_PAD_SRC, GST_PAD_ALWAYS, caps));
   agg_class->sinkpads_type = GST_TYPE_IMXCOMPOSITOR_PAD;
+  videoaggregator_class->negotiated_caps = gst_imxcompositor_negotiated_caps;
+#endif
   agg_class->sink_query = gst_imxcompositor_sink_query;
   agg_class->src_query = gst_imxcompositor_src_query;
 
   videoaggregator_class->find_best_format = gst_imxcompositor_find_best_format;
   videoaggregator_class->update_caps = gst_imxcompositor_update_caps;
   videoaggregator_class->aggregate_frames = gst_imxcompositor_aggregate_frames;
-  videoaggregator_class->negotiated_caps = gst_imxcompositor_negotiated_caps;
   videoaggregator_class->get_output_buffer=gst_imxcompositor_get_output_buffer;
 
   g_object_class_install_property (gobject_class,

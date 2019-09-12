@@ -16,7 +16,7 @@
 
 /*
  * Copyright (c) 2013-2015, Freescale Semiconductor, Inc.
- * Copyright 2017 NXP
+ * Copyright 2017-2019 NXP
  */
 
 
@@ -342,7 +342,7 @@ static GstFlowReturn gst_aiurdemux_close_core (GstAiurDemux * demux);
 
 
 
-
+#define SUBTITLE_GAP_INTERVAL (GST_SECOND/5)
 
 #define AIUR_MEDIATYPE2STR(media) \
     (((media)==MEDIA_VIDEO)?"video":(((media)==MEDIA_AUDIO)?"audio":"subtitle"))
@@ -430,7 +430,7 @@ static void gst_aiurdemux_class_init (GstAiurDemuxClass * klass)
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&gst_aiurdemux_subsrc_template));
 
-  gst_element_class_set_static_metadata (gstelement_class, "Aiur universal demuxer",
+  gst_element_class_set_static_metadata (gstelement_class, "IMX Aiur universal demuxer",
       "Codec/Demuxer",
       "demux container file to video, audio, and subtitle",
       "FreeScale Multimedia Team <shamm@freescale.com>");
@@ -609,6 +609,7 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
 
       if (segment->stop < segment->start) {
         gst_event_unref (event);
+        GST_ERROR_OBJECT (demux, "failed to handle sink event GST_EVENT_SEGMENT");
         return FALSE;
       }
 
@@ -665,6 +666,13 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
         goto drop;
         break;
         }
+    case GST_EVENT_CUSTOM_DOWNSTREAM_STICKY:
+    {
+      /* drop this event to avoid typefind push event error */
+      GST_WARNING ("need to drop sink event GST_EVENT_CUSTOM_DOWNSTREAM_STICKY");
+      gst_event_unref (event);
+      goto drop;
+    }
     default:
         GST_LOG_OBJECT(demux,"gst_aiurdemux_handle_sink_event event=%x",GST_EVENT_TYPE (event));
       break;
@@ -673,6 +681,8 @@ static gboolean gst_aiurdemux_handle_sink_event(GstPad * sinkpad, GstObject * pa
   res = gst_pad_event_default (demux->sinkpad, parent, event);
 
 drop:
+  if (res == FALSE)
+      GST_ERROR_OBJECT (demux, "failed to handle sink event %" GST_PTR_FORMAT, event);
   return res;
 
 }
@@ -2458,7 +2468,7 @@ static void aiurdemux_parse_audio (GstAiurDemux * demux, AiurDemuxStream * strea
         codec = "Dobly Digital Plus (E-AC3)";
         mime =
             g_strdup_printf
-            ("audio/eac3, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld",
+            ("audio/x-eac3, channels=(int)%ld, rate=(int)%ld, bitrate=(int)%ld",
             stream->info.audio.n_channels, stream->info.audio.rate,
             stream->bitrate);
         break;
@@ -2738,7 +2748,7 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
     stream = aiurdemux_trackidx_to_stream (demux, *track_idx);
 
     if((parser_ret == PARSER_EOS) || (PARSER_BOS == parser_ret)
-        || (PARSER_READ_ERROR == parser_ret)){
+        || (PARSER_READ_ERROR == parser_ret) || (PARSER_ERR_INVALID_PARAMETER == parser_ret)){
         if (demux->read_mode == PARSER_READ_MODE_FILE_BASED) {
             aiurdemux_send_stream_eos_all (demux);
             ret = GST_FLOW_EOS;
@@ -2783,16 +2793,18 @@ static GstFlowReturn aiurdemux_read_buffer (GstAiurDemux * demux, uint32* track_
 
       GST_INFO ("min_time=%lld\n", min_time);
 
+      /* sutitle gap is used to inform the downstream elements that there is no data for a
+       * certain amount of time, SUBTITLE_GAP_INTERVAL is set to avoid video being blocked. */
       if (GST_CLOCK_TIME_IS_VALID(stream->time_position) &&
           min_time != G_MAXINT64 &&
-          stream->time_position + GST_SECOND <= min_time) {
+          stream->time_position + SUBTITLE_GAP_INTERVAL <= min_time) {
         if (stream->new_segment) {
           aiurdemux_send_stream_newsegment (demux, stream);
         }
 
-        GstEvent *gap = gst_event_new_gap (stream->time_position, GST_SECOND);
+        GstEvent *gap = gst_event_new_gap (stream->time_position, SUBTITLE_GAP_INTERVAL);
         stream->last_start = stream->time_position;
-        stream->last_stop = stream->time_position + GST_SECOND;
+        stream->last_stop = stream->time_position + SUBTITLE_GAP_INTERVAL;
 
         gst_pad_push_event (stream->pad, gap);
         GST_INFO ("TEXT GAP event sent %d, time_position=%lld, "
@@ -3828,6 +3840,8 @@ aiurdemux_do_seek (GstAiurDemux * demux, GstPad * pad, GstEvent * event)
   memcpy (&seeksegment, &demux->segment, sizeof (GstSegment));
 
   if (event) {
+    if (cur > seeksegment.stop)
+      seeksegment.stop = cur;
     gst_segment_do_seek (&seeksegment, rate, format, flags,
         cur_type, cur, stop_type, stop, &update);
   }

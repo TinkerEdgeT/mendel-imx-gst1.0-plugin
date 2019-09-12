@@ -15,7 +15,8 @@
 */
 
 /*
- * Copyright (C) 2010-2011 Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright (C) 2010-2011, 2014 Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2018 NXP
  *
  */
 
@@ -53,4 +54,4 @@ plugin_init (GstPlugin * plugin)
 
 }
 
-IMX_GST_PLUGIN_DEFINE (aiur, "aiur universal demux", plugin_init);
+IMX_GST_PLUGIN_DEFINE (aiurdemux, "aiur universal demux", plugin_init);

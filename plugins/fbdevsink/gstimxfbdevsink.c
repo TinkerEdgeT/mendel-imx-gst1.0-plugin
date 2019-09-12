@@ -1,5 +1,5 @@
 /* i.Mx GStreamer fbdev plugin
- * Copyright 2017 NXP
+ * Copyright 2017-2018 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -41,6 +41,7 @@
 
 #include "gstimxfbdevsink.h"
 #include "gstimxcommon.h"
+#include "gstimx.h"
 #include "gstimxvideooverlay.h"
 
 GST_DEBUG_CATEGORY (imx_fbdevsink_debug);
@@ -848,7 +849,7 @@ gst_imx_fbdevsink_class_init (GstImxFBDEVSinkClass * klass)
 
   videosink_class->show_frame = GST_DEBUG_FUNCPTR (gst_imx_fbdevsink_show_frame);
 
-  gst_element_class_set_static_metadata (gstelement_class, "imx fbdev video sink",
+  gst_element_class_set_static_metadata (gstelement_class, "IMX fbdev video sink",
       "Sink/Video", "Linux framebuffer videosink for i.Mx",
       IMX_GST_PLUGIN_AUTHOR);
 

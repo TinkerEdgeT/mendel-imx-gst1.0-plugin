@@ -194,7 +194,7 @@ gst_beep_dec_class_init (GstBeepDecClass * klass)
     //base_class->parse = GST_DEBUG_FUNCPTR (beep_dec_parse_and_decode);
     base_class->flush = GST_DEBUG_FUNCPTR (beep_dec_flush);
 
-    gst_element_class_set_static_metadata (gstelement_class, "Beep universal decoder",
+    gst_element_class_set_static_metadata (gstelement_class, "IMX Beep universal decoder",
         "Codec/Decoder/Audio",
         "Decode compressed audio to raw data",
         "FreeScale Multimedia Team <shamm@freescale.com>");
@@ -457,10 +457,13 @@ static gboolean beep_dec_set_format(GstAudioDecoder *dec, GstCaps *caps)
               type = DAB_PLUS;
             } else if (!strcmp (IDecoder->name, "sbc")) {
               type = SBCDEC;
-            } else {
+            } else if (!strcmp (IDecoder->name, "vorbis")) {
+              type = OGG;
+            }else {
               goto dsp_fail;
             }
-            beepdec->handle = IDecoder->createDecoderplus(&ops, type);
+            if (beepdec->handle == NULL)
+              beepdec->handle = IDecoder->createDecoderplus(&ops, type);
             if (beepdec->handle == NULL) {
               /* create fail, dsp not support */
               GST_INFO (" dsp create decoder fail ");
@@ -499,7 +502,8 @@ dsp_fail:
         ops.ReAlloc = beepdec_core_mem_realloc;
         ops.Free = beepdec_core_mem_free;
 
-        beepdec->handle = IDecoder->createDecoder (&ops);
+        if(beepdec->handle == NULL)
+          beepdec->handle = IDecoder->createDecoder (&ops);
 
         if(beepdec->handle == NULL)
             break;
@@ -864,7 +868,7 @@ begin:
         GST_LOG_OBJECT (beepdec,"decode RET=%x input size=%d,used size=%d,output_size=%d"
             ,core_ret,inbuf_size,offset,out_size);
 
-        if (ACODEC_ERROR_STREAM == core_ret) {
+        if ((ACODEC_ERROR_STREAM == core_ret) || (ACODEC_ERR_UNKNOWN == core_ret)){
             GST_WARNING("decode END error = %x\n", core_ret);
             IDecoder->resetDecoder(handle);
             //send null frame to delete the timestamp

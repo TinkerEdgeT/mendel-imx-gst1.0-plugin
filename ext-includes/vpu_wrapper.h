@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2010-2016, Freescale Semiconductor, Inc.
- * Copyright 2017 NXP
+ * Copyright 2017-2018 NXP
  */
 
 /*
@@ -59,6 +59,13 @@ typedef void * VpuDecHandle;
 //typedef DecBufInfo VpuDecBufInfo;
 //typedef CodecCommand VpuCodecCommand;
 //typedef DecParam VpuDecParam;
+
+typedef enum {
+    VPU_TYPE_UNKNOWN = 0,
+    VPU_TYPE_CHIPSMEDIA,
+    VPU_TYPE_MALONE,
+    VPU_TYPE_HANTRO,
+} VpuType;
 
 typedef enum {
 	VPU_DEC_ERR_UNFOUND=0,
@@ -262,6 +269,7 @@ typedef struct {
 	int nAdaptiveMode;
 	void* pAppCxt;			/*reserved for future application extension*/
     int nSecureMode;
+    int nSecureBufferAllocSize;
 } VpuDecOpenParam;
 
 
@@ -369,6 +377,7 @@ typedef struct {
 	int nReserved[3];			/*reserved for future extension*/
 	void* pSpecialInfo;		/*reserved for future special extension*/
 
+        int hasColorDesc;
         int hasHdr10Meta;
         VpuHDR10Meta Hdr10Meta; /* HDR10 meta data */
         VpuColourDesc ColourDesc;
@@ -490,7 +499,7 @@ typedef struct {
 
 /**************************** encoder part **********************************/
 
-typedef unsigned int VpuEncHandle;
+typedef void * VpuEncHandle;
 
 typedef enum
 {
@@ -500,6 +509,13 @@ typedef enum
 	VPU_COLOR_422V=2,
 	VPU_COLOR_444=3,	
 	VPU_COLOR_400=4,
+	VPU_COLOR_422YUYV=13,
+	VPU_COLOR_422UYVY=14,
+	VPU_COLOR_ARGB8888=15,
+	VPU_COLOR_BGRA8888=16,
+	VPU_COLOR_RGB565=17,
+	VPU_COLOR_RGB555=18,
+	VPU_COLOR_BGR565=19,
 }VpuColorFormat;
 
 typedef enum {
@@ -512,6 +528,7 @@ typedef enum {
 typedef struct {
 	int nMinFrameBufferCount;
 	int nAddressAlignment;		/*address alignment for Y/Cb/Cr (unit: bytes)*/
+	VpuType eType;
 } VpuEncInitInfo;
 
 typedef enum 
@@ -656,11 +673,11 @@ typedef struct {
 	int nFrameRate;
 	int nQuantParam;
 
-	unsigned int nInPhyInput;	//input buffer address
-	unsigned int nInVirtInput;
+	unsigned long nInPhyInput;	//input buffer address
+	unsigned long nInVirtInput;
 	int nInInputSize;	
-	unsigned int nInPhyOutput;	//output frame address
-	unsigned int nInVirtOutput;
+	unsigned long nInPhyOutput;	//output frame address
+	unsigned long nInVirtOutput;
 	unsigned int nInOutputBufLen;
 
 	/*advanced options*/

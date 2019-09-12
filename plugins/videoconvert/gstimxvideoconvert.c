@@ -1,5 +1,6 @@
 /* GStreamer IMX video convert plugin
  * Copyright (c) 2014-2016, Freescale Semiconductor, Inc. All rights reserved.
+ * Copyright 2017-2018 NXP
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -23,6 +24,8 @@
 
 #include <gst/video/video.h>
 #include <gst/allocators/gstdmabuf.h>
+#include <gst/allocators/gstdmabufmeta.h>
+#include <libdrm/drm_fourcc_imx.h>
 #include <gst/allocators/gstallocatorphymem.h>
 #ifdef USE_ION
 #include <gst/allocators/gstionmemory.h>
@@ -1216,6 +1219,20 @@ static gboolean imx_video_convert_set_info(GstVideoFilter *filter,
   return TRUE;
 }
 
+static guint8 *
+_get_cached_phyaddr (GstMemory * mem)
+{
+    return gst_mini_object_get_qdata (GST_MINI_OBJECT (mem),
+              g_quark_from_static_string ("phyaddr"));
+}
+
+static void
+_set_cached_phyaddr (GstMemory * mem, guint8 * phyadd)
+{
+  return gst_mini_object_set_qdata (GST_MINI_OBJECT (mem),
+                g_quark_from_static_string ("phyaddr"), phyadd, NULL);
+}
+
 static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     GstVideoFrame *in, GstVideoFrame *out)
 {
@@ -1230,6 +1247,8 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
   guint i, n_mem;
   GstVideoCropMeta *in_crop = NULL, *out_crop = NULL;
   GstVideoInfo info;
+  GstDmabufMeta *dmabuf_meta;
+  gint64 drm_modifier = 0;
 
   if (!device)
     return GST_FLOW_ERROR;
@@ -1353,6 +1372,22 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
               imxvct->in_video_align.padding_bottom;
   src.info.stride = in->info.stride[0];
 
+  dmabuf_meta = gst_buffer_get_dmabuf_meta (in->buffer);
+  if (dmabuf_meta) {
+    drm_modifier = dmabuf_meta->drm_modifier;
+    dmabuf_meta->drm_modifier = 0;
+  }
+
+  dmabuf_meta = gst_buffer_get_dmabuf_meta (out->buffer);
+  if (dmabuf_meta) {
+    dmabuf_meta->drm_modifier = 0;
+  }
+
+  GST_INFO_OBJECT (imxvct, "buffer modifier type %d", drm_modifier);
+
+  if (drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED)
+    src.info.tile_type = IMX_2D_TILE_AMHPION;
+
   gint ret = device->config_input(device, &src.info);
 
   GST_LOG ("Input: %s, %dx%d(%d)", GST_VIDEO_FORMAT_INFO_NAME(in->info.finfo),
@@ -1439,6 +1474,11 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
       src.interlace_type = IMX_2D_INTERLACE_PROGRESSIVE;
       break;
   }
+  if (GST_BUFFER_FLAG_IS_SET (input_frame->buffer, GST_VIDEO_BUFFER_FLAG_INTERLACED)) {
+    src.interlace_type = IMX_2D_INTERLACE_INTERLEAVED;
+    GST_BUFFER_FLAG_UNSET (input_frame->buffer, GST_VIDEO_BUFFER_FLAG_INTERLACED);
+    GST_BUFFER_FLAG_UNSET (out->buffer, GST_VIDEO_BUFFER_FLAG_INTERLACED);
+  }
 
   if (gst_is_dmabuf_memory (gst_buffer_peek_memory (out->buffer, 0))) {
     dst.mem = &dst_mem;
@@ -1467,9 +1507,23 @@ static GstFlowReturn imx_video_convert_transform_frame(GstVideoFilter *filter,
     dst.crop.h = MIN(out_crop->height, (out->info.height - out_crop->y));
   }
 
+  if (!src.mem->paddr)
+    src.mem->paddr = _get_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 0));
+  if (!src.mem->user_data && src.fd[1])
+    src.mem->user_data = _get_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 1));
+  if (!dst.mem->paddr)
+    dst.mem->paddr = _get_cached_phyaddr (gst_buffer_peek_memory (out->buffer, 0));
+
   //convert
   if (device->convert(device, &dst, &src) == 0) {
     GST_TRACE ("frame conversion done");
+
+    if (!_get_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 0)))
+      _set_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 0), src.mem->paddr);
+    if (src.fd[1] && !_get_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 1)))
+      _set_cached_phyaddr (gst_buffer_peek_memory (input_frame->buffer, 1), src.mem->user_data);
+    if (!_get_cached_phyaddr (gst_buffer_peek_memory (out->buffer, 0)))
+      _set_cached_phyaddr (gst_buffer_peek_memory (out->buffer, 0), dst.mem->paddr);
 
     if (imxvct->composition_meta_enable) {
       if (imx_video_overlay_composition_has_meta(in->buffer)) {

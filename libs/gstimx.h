@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2013, Freescale Semiconductor, Inc. All rights reserved.
  * Copyright 2018 NXP
  *
  * This library is free software; you can redistribute it and/or
@@ -18,33 +17,19 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
+#ifndef __IMX_H__
+#define __IMX_H__
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-#include <string.h>
-#include <gst/gst.h>
+unsigned long phy_addr_from_fd(int dmafd);
+unsigned long phy_addr_from_vaddr(void *vaddr, int size);
 
-#include "gstimxcommon.h"
-#include "gstvpuenc.h"
-#include "gstvpudec.h"
 
-static gboolean
-plugin_init (GstPlugin * plugin)
-{
-  if (HAS_VPU()) {
-    if (!IS_HANTRO() || IS_IMX8MM())
-      if (!gst_vpu_enc_register (plugin))
-        return FALSE;
-    
-    if (!gst_element_register (plugin, "vpudec", IMX_GST_PLUGIN_RANK,
-          GST_TYPE_VPU_DEC))
-      return FALSE;
-
-    return TRUE;
-  } else {
-    return FALSE;
-  }
+#ifdef __cplusplus
 }
+#endif
 
-IMX_GST_PLUGIN_DEFINE (vpu, "VPU video codec", plugin_init);
+#endif /* __IMX_H__ */
