@@ -24,6 +24,8 @@
 #include <pthread.h>
 #include <signal.h>
 #include <getopt.h>
+#include <unistd.h>
+#include <glib.h>
 #define __USE_LARGEFILE64
 #include <sys/statvfs.h>
 
@@ -37,7 +39,7 @@
 
 #define START_MEDIATIME_INFO_THREAD(thread, recorder)\
   do{\
-    if (thread == NULL){\
+    if (thread == 0){\
       exit_thread = RE_BOOLEAN_FALSE;\
       pthread_create(&(thread), NULL, display_media_time, (recorder));\
     }\
@@ -48,7 +50,7 @@
     if((thread && exit_thread == RE_BOOLEAN_FALSE)) {\
       exit_thread = RE_BOOLEAN_TRUE;\
       pthread_join ((thread), NULL);\
-      (thread)=NULL;\
+      (thread)=0;\
     }\
   }while(0)
 
@@ -65,7 +67,7 @@
 
 #define START_MESSAGE_PROCESS_THREAD(thread, recorder)\
   do{\
-    if (thread == NULL){\
+    if (thread == 0){\
       exit_thread = RE_BOOLEAN_FALSE;\
       pthread_create(&(thread), NULL, process_message, (recorder));\
     }\
@@ -77,7 +79,7 @@
       exit_thread = RE_BOOLEAN_TRUE;\
       sem_post(&grecordersem);\
       pthread_join ((thread), NULL);\
-      (thread)=NULL;\
+      (thread)=0;\
     }\
   }while(0)
 
@@ -157,8 +159,8 @@ typedef struct {
   REboolean use_default_filename;
 }REOptions;
 
-static pthread_t media_time_thread = NULL;
-static pthread_t message_process_thread = NULL;
+static pthread_t media_time_thread = 0;
+static pthread_t message_process_thread = 0;
 static REboolean exit_thread = RE_BOOLEAN_FALSE;
 static REboolean bstartmediatime = RE_BOOLEAN_FALSE;
 static REchar path[1024];
@@ -167,6 +169,8 @@ static sem_t grecordersem;
 static RecorderMessage latest_message = MESSAGE_NULL;
 
 static volatile sig_atomic_t quit_flag = 0;
+
+static void post_message (RecorderMessage message);
 
 static void signal_handler(int signum)
 {
@@ -197,7 +201,7 @@ static void monitor_storage_free_size (RecorderEngine* recorder)
   }
 }
 
-static void display_media_time (void* param)
+static void* display_media_time (void* param)
 {
   RecorderEngine* recorder = 	(RecorderEngine*)param;
   REtime sCur;
@@ -214,7 +218,7 @@ static void display_media_time (void* param)
       {
         Hours = (sCur/1000000) / 3600;
         Minutes = (sCur/ (60*1000000)) % 60;
-        Seconds = ((sCur %(3600*1000000)) % (60*1000000))/1000000;
+        Seconds = ((sCur %(3600L*1000000L)) % (60*1000000))/1000000;
         printf("\r[Current Media Time] %03d:%02d:%02d", 
             Hours, Minutes, Seconds);
         fflush(stdout);
@@ -228,7 +232,7 @@ static void display_media_time (void* param)
       usleep (50000);
   }
 
-  return;
+  return NULL;
 }
 
 static int set_recoder_setting (RecorderEngine *recorder, REOptions * pOpt)
@@ -476,13 +480,13 @@ static int set_recoder_setting_video (RecorderEngine *recorder, REOptions * pOpt
   return 0;
 }
 
-void post_message (RecorderMessage message)
+static void post_message (RecorderMessage message)
 {
   latest_message = message;
   sem_post(&grecordersem);
 }
 
-static void process_message (void* param)
+static void* process_message (void* param)
 {
   RecorderEngine* recorder = 	(RecorderEngine*)param;
 
@@ -520,7 +524,7 @@ static void process_message (void* param)
     }
   }
 
-  return;
+  return NULL;
 }
 
 static void list_camera_capabilities (RecorderEngine* recorder) 
@@ -544,7 +548,7 @@ static void list_camera_capabilities (RecorderEngine* recorder)
   }
 }
 
-static int event_handler(void* context, REuint32 eventID, void* Eventpayload)
+static unsigned int event_handler(void* context, REuint32 eventID, void* Eventpayload)
 {
   RecorderEngine* recorder = (RecorderEngine*) context;
   switch(eventID) {
@@ -862,7 +866,9 @@ int main(int argc, char* argv[])
     {
       if (read_input){
         recorder_main_menu();
-        scanf("%128s", rep);
+        ret = scanf("%128s", rep);
+        if (ret)
+          ret = 0;
       }
       read_input=RE_BOOLEAN_TRUE;
       if (quit_flag) {

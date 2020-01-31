@@ -23,7 +23,9 @@
 #include <gst/video/gstvideometa.h>
 #include <gst/video/gstvideohdr10meta.h>
 #include "gstimxcommon.h"
+#include <gst/allocators/gstdmabufmeta.h>
 #include <gst/allocators/gstphymemmeta.h>
+#include <gst/allocators/gstphysmemory.h>
 #include "gstvpuallocator.h"
 #include "gstvpudecobject.h"
 
@@ -415,7 +417,7 @@ gst_vpu_dec_object_stop (GstVpuDecObject * vpu_dec_object)
 {
   VpuDecRetCode dec_ret;
 
-  GST_INFO_OBJECT(vpu_dec_object, "Video decoder frames: %lld time: %lld fps: (%.3f).\n",
+  GST_INFO_OBJECT(vpu_dec_object, "Video decoder frames: %ld time: %ld fps: (%.3f).\n",
       vpu_dec_object->total_frames, vpu_dec_object->total_time, (gfloat)1000000
       * vpu_dec_object->total_frames / vpu_dec_object->total_time);
   if (vpu_dec_object->gstbuffer_in_vpudec != NULL) {
@@ -709,8 +711,8 @@ gst_vpu_dec_object_register_frame_buffer (GstVpuDecObject * vpu_dec_object, \
     g_hash_table_replace(vpu_dec_object->gstbuffer2frame_table, \
         (gpointer)(buffer), \
         (gpointer)(&(vpu_dec_object->vpuframebuffers[i])));
-    GST_DEBUG_OBJECT (vpu_dec_object, "VpuFrameBuffer: 0x%x VpuFrameBuffer pbufVirtY: 0x%x GstBuffer: 0x%x\n", \
-        vpu_dec_object->vpuframebuffers[i], vpu_dec_object->vpuframebuffers[i].pbufVirtY, buffer);
+    GST_DEBUG_OBJECT (vpu_dec_object, "VpuFrameBuffer: %p VpuFrameBuffer pbufVirtY: %p GstBuffer: %p\n", \
+        &vpu_dec_object->vpuframebuffers[i], vpu_dec_object->vpuframebuffers[i].pbufVirtY, buffer);
   }
 
   if (!IS_AMPHION()) {
@@ -823,7 +825,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   vpu_dec_object->min_buf_cnt = vpu_dec_object->init_info.nMinFrameBufferCount;
   vpu_dec_object->frame_size = vpu_dec_object->init_info.nFrameSize;
   vpu_dec_object->init_info.nBitDepth;
-  GST_INFO_OBJECT(vpu_dec_object, "video bit depth: %d", vpu_dec_object->init_info.nBitDepth);
+  GST_ERROR_OBJECT(vpu_dec_object, "video bit depth: %d min_buf_cnt %d", vpu_dec_object->init_info.nBitDepth, vpu_dec_object->min_buf_cnt);
   GST_VIDEO_INFO_INTERLACE_MODE(&(state->info)) = \
     vpu_dec_object->init_info.nInterlace ? GST_VIDEO_INTERLACE_MODE_INTERLEAVED \
     : GST_VIDEO_INTERLACE_MODE_PROGRESSIVE;
@@ -874,7 +876,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
     vpu_dec_object->gstbuffer_in_vpudec2 = g_list_append ( \
         vpu_dec_object->gstbuffer_in_vpudec2, buffer);
     GST_DEBUG_OBJECT (vpu_dec_object, "gst_video_decoder_allocate_output_buffer end");
-    GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer get from buffer pool: %x\n", buffer);
+    GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer get from buffer pool: %p\n", buffer);
     GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer_in_vpudec list length: %d actual_buf_cnt: %d \n", \
         g_list_length (vpu_dec_object->gstbuffer_in_vpudec), vpu_dec_object->actual_buf_cnt);
   }
@@ -919,14 +921,14 @@ gst_vpu_dec_object_release_frame_buffer_to_vpu (GstVpuDecObject * vpu_dec_object
       vpu_dec_object->gstbuffer_in_vpudec, buffer);
   frame_buffer = g_hash_table_lookup(vpu_dec_object->gstbuffer2frame_table, buffer);
   if (!frame_buffer) {
-    GST_ERROR_OBJECT(vpu_dec_object, "buffer 0x%x not in gstbuffer2frame_table, "
+    GST_ERROR_OBJECT(vpu_dec_object, "buffer %p not in gstbuffer2frame_table, "
         "pool returned a newly allocated buffer which is not supported", buffer);
     return FALSE;
   }
   GST_DEBUG_OBJECT (vpu_dec_object, "gstbuffer_in_vpudec list length: %d\n", \
       g_list_length (vpu_dec_object->gstbuffer_in_vpudec));
 
-  GST_LOG_OBJECT (vpu_dec_object, "GstBuffer: 0x%x VpuFrameBuffer: 0x%x\n", \
+  GST_LOG_OBJECT (vpu_dec_object, "GstBuffer: %p VpuFrameBuffer: %p\n", \
       buffer, frame_buffer);
   dec_ret = VPU_DecOutFrameDisplayed(vpu_dec_object->handle, frame_buffer);
   if (dec_ret != VPU_DEC_RET_SUCCESS) {
@@ -947,7 +949,7 @@ gst_vpu_dec_object_process_qos (GstVpuDecObject * vpu_dec_object, \
 
   if (frame) {
     GstClockTimeDiff diff = gst_video_decoder_get_max_decode_time (bdec, frame);
-    GST_DEBUG_OBJECT(vpu_dec_object, "diff: %lld\n", diff);
+    GST_DEBUG_OBJECT(vpu_dec_object, "diff: %ld\n", diff);
     if (diff < 0) {
       if (vpu_dec_object->dropping == FALSE) { 
         GST_WARNING_OBJECT(vpu_dec_object, "decoder can't catch up. need drop frame.\n");
@@ -969,7 +971,7 @@ gst_vpu_dec_object_process_qos (GstVpuDecObject * vpu_dec_object, \
             gst_vpu_dec_object_strerror(ret));
         return FALSE;
       }
-      GST_WARNING_OBJECT(vpu_dec_object, "decoder can catch up. needn't drop frame. diff: %lld\n", \
+      GST_WARNING_OBJECT(vpu_dec_object, "decoder can catch up. needn't drop frame. diff: %ld\n", \
           diff);
       vpu_dec_object->dropping = FALSE;
     }
@@ -1005,14 +1007,14 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
   g_list_free (l);
 #endif
 
-  frame_number = g_list_nth_data (vpu_dec_object->system_frame_number_in_vpu, 0);
+  frame_number = (gint)(guint64)g_list_nth_data (vpu_dec_object->system_frame_number_in_vpu, 0);
   GST_DEBUG_OBJECT(vpu_dec_object, "system frame number send out: %d list length: %d \n", \
       frame_number, g_list_length (vpu_dec_object->system_frame_number_in_vpu));
   vpu_dec_object->system_frame_number_in_vpu = g_list_remove ( \
-      vpu_dec_object->system_frame_number_in_vpu, frame_number);
+      vpu_dec_object->system_frame_number_in_vpu, (gpointer)(guint64)frame_number);
 
   out_frame = gst_video_decoder_get_frame (bdec, frame_number);
-  GST_LOG_OBJECT (vpu_dec_object, "gst_video_decoder_get_frame: 0x%x\n", \
+  GST_LOG_OBJECT (vpu_dec_object, "gst_video_decoder_get_frame: %p\n", \
       out_frame);
   if (out_frame && vpu_dec_object->frame_drop)
     gst_vpu_dec_object_process_qos (vpu_dec_object, bdec, out_frame);
@@ -1025,7 +1027,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
       return GST_FLOW_ERROR;
     }
 
-    GST_LOG_OBJECT(vpu_dec_object, "vpu display buffer: 0x%x pbufVirtY: 0x%x\n", \
+    GST_LOG_OBJECT(vpu_dec_object, "vpu display buffer: %p pbufVirtY: %p\n", \
         out_frame_info.pDisplayFrameBuf, out_frame_info.pDisplayFrameBuf->pbufVirtY);
     output_pts = TSManagerSend2 (vpu_dec_object->tsm, \
         out_frame_info.pDisplayFrameBuf);
@@ -1113,7 +1115,7 @@ gst_vpu_dec_object_send_output (GstVpuDecObject * vpu_dec_object, \
 
   if (vpu_dec_object->drm_modifier) {
     gst_buffer_add_dmabuf_meta(out_frame->output_buffer, vpu_dec_object->drm_modifier);
-    GST_DEBUG_OBJECT(vpu_dec_object, "add drm modifier: %lld\n", vpu_dec_object->drm_modifier);
+    GST_DEBUG_OBJECT(vpu_dec_object, "add drm modifier: %lu\n", vpu_dec_object->drm_modifier);
   }
 
   /* set physical memory padding info */
@@ -1261,7 +1263,7 @@ gst_vpu_dec_object_handle_input_time_stamp (GstVpuDecObject * vpu_dec_object, \
   gst_buffer_map (buffer, &minfo, GST_MAP_READ);
 
   if (buffer) {
-    GST_DEBUG_OBJECT (vpu_dec_object, "Chain in with size = %d", minfo.size);
+    GST_DEBUG_OBJECT (vpu_dec_object, "Chain in with size = %lu", minfo.size);
 
     if (G_UNLIKELY ((vpu_dec_object->new_segment))) {
       gdouble rate = bdec->input_segment.rate;
@@ -1322,7 +1324,7 @@ gst_vpu_dec_object_set_vpu_input_buf (GstVpuDecObject * vpu_dec_object, \
   }
 
   vpu_dec_object->system_frame_number_in_vpu = g_list_append ( \
-      vpu_dec_object->system_frame_number_in_vpu, frame->system_frame_number);
+      vpu_dec_object->system_frame_number_in_vpu, (gpointer)(guint64)frame->system_frame_number);
   GST_DEBUG_OBJECT (vpu_dec_object, "vpu_dec_object received system_frame_number: %d\n", \
       frame->system_frame_number);
 
@@ -1338,7 +1340,7 @@ gst_vpu_dec_object_set_vpu_input_buf (GstVpuDecObject * vpu_dec_object, \
     gst_buffer_map (buffer2, &minfo2, GST_MAP_READ);
     vpu_buffer_node->sCodecData.nSize = minfo2.size;
     vpu_buffer_node->sCodecData.pData = minfo2.data;
-    GST_DEBUG_OBJECT (vpu_dec_object, "codec data size: %d\n", minfo2.size);
+    GST_DEBUG_OBJECT (vpu_dec_object, "codec data size: %lu\n", minfo2.size);
     gst_buffer_unmap (buffer2, &minfo2);
   }
 
@@ -1379,7 +1381,7 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
 	VpuBufferNode in_data = {0};
 	int buf_ret;
 
-  GST_LOG_OBJECT (vpu_dec_object, "GstVideoCodecFrame: 0x%x\n", frame);
+  GST_LOG_OBJECT (vpu_dec_object, "GstVideoCodecFrame: %p\n", frame);
   gst_vpu_dec_object_handle_input_time_stamp (vpu_dec_object, bdec, frame);
   gst_vpu_dec_object_set_vpu_input_buf (vpu_dec_object, frame, &in_data);
   if (frame)
@@ -1403,7 +1405,7 @@ gst_vpu_dec_object_decode (GstVpuDecObject * vpu_dec_object, \
       return GST_FLOW_ERROR;
     }
 
-    GST_DEBUG_OBJECT (vpu_dec_object, "buf status: 0x%x time: %lld\n", \
+    GST_DEBUG_OBJECT (vpu_dec_object, "buf status: 0x%x time: %ld\n", \
         buf_ret, g_get_monotonic_time () - start_time);
     vpu_dec_object->total_time += g_get_monotonic_time () - start_time;
 

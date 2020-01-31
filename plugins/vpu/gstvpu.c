@@ -20,6 +20,7 @@
 #include "gstvpuenc.h"
 #include <gst/allocators/gstphysmemory.h>
 #include "gstimxcommon.h"
+#include "gstimx.h"
 
 gint
 gst_vpu_find_std (GstCaps * caps)
@@ -111,7 +112,7 @@ gst_vpu_register_frame_buffer (GList * gstbuffer_in_vpudec, \
 
   for (i=0; i<g_list_length (gstbuffer_in_vpudec); i++) {
     buffer = g_list_nth_data (gstbuffer_in_vpudec, i);
-    GST_DEBUG ("gstbuffer index: %d get from list: %x\n", \
+    GST_DEBUG ("gstbuffer index: %d get from list: %p\n", \
         i, buffer);
     vpu_frame = &(vpuframebuffers[i]);
 
@@ -137,7 +138,7 @@ gst_vpu_register_frame_buffer (GList * gstbuffer_in_vpudec, \
     }
 
     if (gst_is_phys_memory (gst_buffer_peek_memory (buffer, 0))) {
-      vpu_frame->pbufY = gst_phys_memory_get_phys_addr(gst_buffer_peek_memory (buffer, 0));
+      vpu_frame->pbufY = (guchar*)gst_phys_memory_get_phys_addr(gst_buffer_peek_memory (buffer, 0));
       GST_DEBUG ("video buffer phys add: %p", vpu_frame->pbufY);
     } else {
       mem_block = gst_buffer_query_phymem_block (buffer);

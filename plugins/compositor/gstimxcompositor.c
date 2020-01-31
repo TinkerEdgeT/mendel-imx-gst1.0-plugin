@@ -772,14 +772,13 @@ gst_imxcompositor_src_query (GstAggregator * agg, GstQuery * query)
 }
 
 static gboolean
-gst_imxcompositor_negotiated_caps (GstVideoAggregator * vagg, GstCaps * caps)
+gst_imxcompositor_negotiated_caps (GstAggregator * agg, GstCaps * caps)
 {
-  GstImxCompositor *imxcomp = (GstImxCompositor *) (vagg);
+  GstImxCompositor *imxcomp = (GstImxCompositor *) (agg);
   GstQuery *query;
   gboolean result = TRUE;
   GstStructure *config = NULL;
   guint size, num, min = 0, max = 0;
-  GstAggregator *agg = GST_AGGREGATOR (imxcomp);
 
   GST_DEBUG("negotiated caps: %" GST_PTR_FORMAT, caps);
 
@@ -933,8 +932,7 @@ gst_imxcompositor_find_best_format (
 }
 
 static GstCaps *
-gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps,
-    GstCaps * filter)
+gst_imxcompositor_update_caps (GstVideoAggregator * vagg, GstCaps * caps)
 {
   GList *l;
   gint best_width = -1, best_height = -1;
@@ -1162,7 +1160,7 @@ static gint gst_imxcompositor_config_src(GstImxCompositor *imxcomp,
   if (dmabuf_meta)
     drm_modifier = dmabuf_meta->drm_modifier;
 
-  GST_INFO_OBJECT (pad, "buffer modifier type %d", drm_modifier);
+  GST_INFO_OBJECT (pad, "buffer modifier type %ld", drm_modifier);
 
   if (drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED)
     src->info.tile_type = IMX_2D_TILE_AMHPION;

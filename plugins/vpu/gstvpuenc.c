@@ -41,6 +41,7 @@
 #include <gst/video/gstvideometa.h>
 #include <gst/video/gstvideopool.h>
 #include <gst/allocators/gstdmabuf.h>
+#include "gstimx.h"
 #include "gstimxcommon.h"
 #include "gstvpuallocator.h"
 #include "gstvpuenc.h"
@@ -510,7 +511,7 @@ gst_vpu_enc_stop (GstVideoEncoder * benc)
 {
   GstVpuEnc *enc = (GstVpuEnc *) benc;
 
-  GST_INFO_OBJECT(enc, "Video encoder frames: %lld time: %lld fps: (%.3f).\n",
+  GST_INFO_OBJECT(enc, "Video encoder frames: %ld time: %ld fps: (%.3f).\n",
       enc->total_frames, enc->total_time, (gfloat)1000000 * enc->total_frames / enc->total_time);
 
   if (!gst_vpu_enc_reset (enc)) {
@@ -1010,7 +1011,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
             fd[i] = gst_dmabuf_memory_get_fd (gst_buffer_peek_memory (frame->input_buffer, i));
           }
           if (fd[0] >= 0)
-            phys_ptr = phy_addr_from_fd (fd[0]);
+            phys_ptr = (unsigned char *) phy_addr_from_fd (fd[0]);
         } else {
           input_phys_buffer = gst_buffer_query_phymem_block (input_buffer);
           if (input_phys_buffer == NULL) {
@@ -1031,7 +1032,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
 		/* this is needed for framebuffers registration below */
 		src_stride = plane_strides[0];
 
-		GST_TRACE_OBJECT(enc, "width: %d   height: %d   stride 0: %d   stride 1: %d   offset 0: %d   offset 1: %d   offset 2: %d", GST_VIDEO_INFO_WIDTH(&(enc->state->info)), GST_VIDEO_INFO_HEIGHT(&(enc->state->info)), plane_strides[0], plane_strides[1], plane_offsets[0], plane_offsets[1], plane_offsets[2]);
+		GST_TRACE_OBJECT(enc, "width: %d   height: %d   stride 0: %d   stride 1: %d   offset 0: %zu   offset 1: %zu   offset 2: %zu", GST_VIDEO_INFO_WIDTH(&(enc->state->info)), GST_VIDEO_INFO_HEIGHT(&(enc->state->info)), plane_strides[0], plane_strides[1], plane_offsets[0], plane_offsets[1], plane_offsets[2]);
 	}
 
   // Allocate needed physical buffer.
@@ -1110,7 +1111,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
       }
 
       enc->total_time += g_get_monotonic_time () - start_time;
-      GST_DEBUG_OBJECT(enc, "encoder consume time: %lld\n", \
+      GST_DEBUG_OBJECT(enc, "encoder consume time: %zu\n", \
           g_get_monotonic_time () - start_time);
 
       if (enc_enc_param.eOutRetCode & VPU_ENC_OUTPUT_SEQHEADER) {
@@ -1131,7 +1132,7 @@ gst_vpu_enc_handle_frame (GstVideoEncoder * benc, GstVideoCodecFrame * frame)
       }
 
       if (enc_enc_param.eOutRetCode & VPU_ENC_OUTPUT_DIS) {
-        GST_LOG_OBJECT(enc, "processing output data: %u bytes, output buffer offset %u", \
+        GST_LOG_OBJECT(enc, "processing output data: %u bytes, output buffer offset %zu", \
             enc_enc_param.nOutOutputSize, output_buffer_offset);
 
         gst_buffer_unmap (output_buffer, &minfo);

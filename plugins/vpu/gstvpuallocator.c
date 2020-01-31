@@ -59,7 +59,7 @@ gst_vpu_alloc_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock 
 	VpuDecRetCode ret;
 	VpuMemDesc mem_desc;
 
-	GST_DEBUG_OBJECT(allocator, "vpu allocator malloc size: %d\n", memory->size);
+	GST_DEBUG_OBJECT(allocator, "vpu allocator malloc size: %zu\n", memory->size);
 	memset(&mem_desc, 0, sizeof(VpuMemDesc));
   // VPU allocate momory is page alignment, so it is ok align size to page.
   // V4l2 capture will check physical memory size when registry buffer.
@@ -71,7 +71,7 @@ gst_vpu_alloc_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock 
 		memory->paddr        = (guint8 *)(mem_desc.nPhyAddr);
 		memory->vaddr         = (guint8 *)(mem_desc.nVirtAddr);
 		memory->caddr         = (guint8 *)(mem_desc.nCpuAddr);
-    GST_DEBUG_OBJECT(allocator, "vpu allocator malloc paddr: %x vaddr: %x\n", \
+    GST_DEBUG_OBJECT(allocator, "vpu allocator malloc paddr: %p vaddr: %p\n", \
         memory->paddr, memory->vaddr);
     return 0;
 	} else {
@@ -85,7 +85,7 @@ gst_vpu_free_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock *
   VpuDecRetCode ret;
   VpuMemDesc mem_desc;
 
-	GST_DEBUG_OBJECT(allocator, "vpu allocator free size: %d\n", memory->size);
+	GST_DEBUG_OBJECT(allocator, "vpu allocator free size: %zu\n", memory->size);
   memset(&mem_desc, 0, sizeof(VpuMemDesc));
 	mem_desc.nSize     = memory->size;
 	mem_desc.nPhyAddr  = (unsigned long)(memory->paddr);
@@ -104,7 +104,7 @@ gst_vpu_copy_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock *
   VpuDecRetCode ret;
   VpuMemDesc mem_desc;
 
-  GST_DEBUG_OBJECT(allocator, "vpu allocator copy size: %d\n", src_mem->size);
+  GST_DEBUG_OBJECT(allocator, "vpu allocator copy size: %zu\n", src_mem->size);
   memset(&mem_desc, 0, sizeof(VpuMemDesc));
 
   if (size > src_mem->size - offset)
@@ -118,7 +118,7 @@ gst_vpu_copy_phys_mem(G_GNUC_UNUSED GstAllocatorPhyMem *allocator, PhyMemBlock *
     dest_mem->paddr        = (guint8 *)(mem_desc.nPhyAddr);
     dest_mem->vaddr         = (guint8 *)(mem_desc.nVirtAddr);
     dest_mem->caddr         = (guint8 *)(mem_desc.nCpuAddr);
-    GST_DEBUG_OBJECT(allocator, "vpu allocator malloc paddr: %x vaddr: %x\n", \
+    GST_DEBUG_OBJECT(allocator, "vpu allocator malloc paddr: %p vaddr: %p\n", \
         dest_mem->paddr, dest_mem->vaddr);
 
     memcpy(dest_mem->vaddr, src_mem->vaddr+offset, size);

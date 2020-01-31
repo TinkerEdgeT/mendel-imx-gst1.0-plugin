@@ -36,12 +36,12 @@ unsigned long phy_addr_from_fd(int dmafd)
   int ret, fd;
 
   if (dmafd < 0)
-    return NULL;
+    return 0;
   
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
   fd = open(dev_ion, O_RDWR);
   if(fd < 0) {
-    return NULL;
+    return 0;
   }
 
   struct ion_phys_dma_data data = {
@@ -58,7 +58,7 @@ unsigned long phy_addr_from_fd(int dmafd)
   ret = ioctl(fd, ION_IOC_CUSTOM, &custom);
   close(fd);
   if (ret < 0)
-    return NULL;
+    return 0;
 
   return data.phys;
 #else
@@ -66,12 +66,12 @@ unsigned long phy_addr_from_fd(int dmafd)
 
   ret = ioctl(dmafd, DMA_BUF_IOCTL_PHYS, &dma_phys);
   if (ret < 0)
-    return NULL;
+    return 0;
 
   return dma_phys.phys;
 #endif
 #else
-  return NULL;
+  return 0;
 #endif
 }
 
@@ -81,7 +81,7 @@ unsigned long phy_addr_from_vaddr(void *vaddr, int size)
   int ret, fd;
 
   if (!vaddr)
-    return NULL;
+    return 0;
   
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
   fd = open(dev_ion, O_RDWR);
@@ -103,13 +103,13 @@ unsigned long phy_addr_from_vaddr(void *vaddr, int size)
   ret = ioctl(fd, ION_IOC_CUSTOM, &custom);
   close(fd);
   if (ret < 0)
-    return NULL;
+    return 0;
 
   return data.phys;
 #else
-  return NULL;
+  return 0;
 #endif
 #else
-  return NULL;
+  return 0;
 #endif
 }

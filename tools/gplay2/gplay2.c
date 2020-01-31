@@ -1429,7 +1429,7 @@ input_thread_fun (gpointer data)
           {
             gint64 pos = 0;
             pos = gst_player_get_position (player);
-            g_print ("Current playing position : %lld\n", pos);
+            g_print ("Current playing position : %ld\n", pos);
           }
             break;
 
@@ -1437,7 +1437,7 @@ input_thread_fun (gpointer data)
           {
             gint64 duration = 0;
             duration = gst_player_get_duration (player);
-            g_print ("Duration : %lld\n", duration);
+            g_print ("Duration : %ld\n", duration);
           }
             break;
 

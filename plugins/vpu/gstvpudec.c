@@ -391,7 +391,7 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
             const GValue *val;
             val = gst_value_list_get_value (vdrm_modifier, j);
             guint64 drm_modifier = g_value_get_uint64 (val);
-            GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %lld", drm_modifier);
+            GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %ld", drm_modifier);
             if (IS_AMPHION() && drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED)
               dec->vpu_dec_object->drm_modifier = drm_modifier;
             else if (IS_HANTRO() && drm_modifier == DRM_FORMAT_MOD_VSI_G2_TILED_COMPRESSED
@@ -408,13 +408,13 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
         } else if (meta = gst_structure_to_string (params)) {
           guint64 drm_modifier;
           GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %s", meta);
-          sscanf (meta, "GstDmabufMeta, dmabuf.drm_modifier=(guint64){ %lld };", &drm_modifier);
-          GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %lld", drm_modifier);
+          sscanf (meta, "GstDmabufMeta, dmabuf.drm_modifier=(guint64){ %lu };", &drm_modifier);
+          GST_DEBUG_OBJECT (dec, "dmabuf meta has modifier: %ld", drm_modifier);
           if (drm_modifier == DRM_FORMAT_MOD_AMPHION_TILED) {
-            GST_DEBUG_OBJECT (dec, "video sink support modifier: %lld", drm_modifier);
+            GST_DEBUG_OBJECT (dec, "video sink support modifier: %ld", drm_modifier);
             dec->vpu_dec_object->drm_modifier = drm_modifier;
           } else {
-            GST_WARNING_OBJECT (dec, "video sink can't support modifier: %lld",
+            GST_WARNING_OBJECT (dec, "video sink can't support modifier: %llu",
                 DRM_FORMAT_MOD_AMPHION_TILED);
           }
         }
@@ -455,7 +455,7 @@ gst_vpu_dec_decide_allocation (GstVideoDecoder * bdec, GstQuery * query)
 
     dec->vpu_dec_object->drm_modifier_pre = dec->vpu_dec_object->drm_modifier;
   }
-  GST_DEBUG_OBJECT (dec, "used modifier: %lld", dec->vpu_dec_object->drm_modifier);
+  GST_DEBUG_OBJECT (dec, "used modifier: %lu", dec->vpu_dec_object->drm_modifier);
 
   if (dec->vpu_dec_object->vpu_need_reconfig == FALSE
     && dec->vpu_dec_object->use_my_pool

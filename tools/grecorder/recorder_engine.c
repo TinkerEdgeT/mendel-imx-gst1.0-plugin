@@ -220,8 +220,8 @@ typedef struct _gRecorderEngine
   int x_width;
   int x_height;
 
-  GString *filename;
-  GString *host;
+  gchar *filename;
+  gchar *host;
   gint port;
   gint max_files;
   gint64 max_file_size;
@@ -284,17 +284,17 @@ create_encording_profile (gRecorderEngine *recorder)
       gst_caps_unref (caps);
       break;
     case RE_OUTPUT_FORMAT_MKV:
-      caps = gst_caps_new_simple ("video/x-matroska", NULL);
+      caps = gst_caps_new_empty_simple ("video/x-matroska");
       container = gst_encoding_container_profile_new ("mkv", NULL, caps, NULL);
       gst_caps_unref (caps);
       break;
     case RE_OUTPUT_FORMAT_AVI:
-      caps = gst_caps_new_simple ("video/x-msvideo", NULL);
+      caps = gst_caps_new_empty_simple ("video/x-msvideo");
       container = gst_encoding_container_profile_new ("avi", NULL, caps, NULL);
       gst_caps_unref (caps);
       break;
     case RE_OUTPUT_FORMAT_FLV:
-      caps = gst_caps_new_simple ("video/x-flv", NULL);
+      caps = gst_caps_new_empty_simple ("video/x-flv");
       container = gst_encoding_container_profile_new ("flv", NULL, caps, NULL);
       gst_caps_unref (caps);
       break;
@@ -311,7 +311,7 @@ create_encording_profile (gRecorderEngine *recorder)
   switch (recorder->video_encoder_format) {
     case RE_VIDEO_ENCODER_DEFAULT:
     case RE_VIDEO_ENCODER_H264:
-        caps = gst_caps_new_simple ("video/x-h264", NULL);
+        caps = gst_caps_new_empty_simple ("video/x-h264");
         sprof = (GstEncodingProfile *)
           gst_encoding_video_profile_new (caps, NULL, NULL, 1);
         //FIXME: videorate has issue.
@@ -333,7 +333,7 @@ create_encording_profile (gRecorderEngine *recorder)
         gst_caps_unref (caps);
         break;
      case RE_VIDEO_ENCODER_H263:
-        caps = gst_caps_new_simple ("video/x-h263", NULL);
+        caps = gst_caps_new_empty_simple ("video/x-h263");
         sprof = (GstEncodingProfile *)
           gst_encoding_video_profile_new (caps, NULL, NULL, 1);
         //FIXME: videorate has issue.
@@ -343,7 +343,7 @@ create_encording_profile (gRecorderEngine *recorder)
         gst_caps_unref (caps);
         break;
      case RE_VIDEO_ENCODER_MJPEG:
-        caps = gst_caps_new_simple ("image/jpeg", NULL);
+        caps = gst_caps_new_empty_simple ("image/jpeg");
         sprof = (GstEncodingProfile *)
           gst_encoding_video_profile_new (caps, NULL, NULL, 1);
         //FIXME: videorate has issue.
@@ -353,7 +353,7 @@ create_encording_profile (gRecorderEngine *recorder)
         gst_caps_unref (caps);
         break;
     case RE_VIDEO_ENCODER_VP8:
-        caps = gst_caps_new_simple ("video/x-vp8", NULL);
+        caps = gst_caps_new_empty_simple ("video/x-vp8");
         sprof = (GstEncodingProfile *)
           gst_encoding_video_profile_new (caps, NULL, NULL, 1);
         //FIXME: videorate has issue.
@@ -490,7 +490,7 @@ sync_bus_callback (GstBus * bus, GstMessage * message, gpointer data)
         } else if (gst_structure_has_name (st, "facedetect")) {
           const GValue *value_list = gst_structure_get_value (st, "faces");
           REVideoRect object_pos;
-          GstStructure *str;
+          const GstStructure *str;
           gchar *sstr;
           guint i, n;
 
@@ -1173,7 +1173,7 @@ run_pipeline (gRecorderEngine *recorder)
   if (recorder->mode == MODE_VIDEO) {
     if (recorder->video_sink) {
       const gchar *filename_suffix;
-      const gchar *filename_str;
+      gchar *filename_str;
       filename_suffix = strrchr(recorder->filename, '.');
       filename_str =
         g_strdup_printf ("%s%s%s", recorder->filename, "%05d", filename_suffix);
@@ -1645,7 +1645,7 @@ static REresult set_camera_output_settings(RecorderEngineHandle handle, RERawVid
                 "format", G_TYPE_STRING, video_format_name,
                 NULL), NULL);
 
-      GST_INFO_OBJECT (recorder->camerabin, "camera output caps is %", 
+      GST_INFO_OBJECT (recorder->camerabin, "camera output caps is %"
           GST_PTR_FORMAT, recorder->camera_output_caps);
     } else {
       recorder->camera_output_caps = gst_caps_new_full (gst_structure_new ("video/x-raw",
@@ -2230,7 +2230,7 @@ static REresult get_media_time(RecorderEngineHandle handle, REtime *pMediaTimeUs
     return ret;
   }
 
-  GST_DEBUG ("current media time: %lld", cur);
+  GST_DEBUG ("current media time: %ld", cur);
   *pMediaTimeUs = cur/1000 - recorder->base_media_timeUs;
 
   return ret;
