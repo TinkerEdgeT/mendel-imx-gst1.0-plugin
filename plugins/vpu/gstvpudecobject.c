@@ -825,7 +825,7 @@ gst_vpu_dec_object_handle_reconfig(GstVpuDecObject * vpu_dec_object, \
   vpu_dec_object->min_buf_cnt = vpu_dec_object->init_info.nMinFrameBufferCount;
   vpu_dec_object->frame_size = vpu_dec_object->init_info.nFrameSize;
   vpu_dec_object->init_info.nBitDepth;
-  GST_ERROR_OBJECT(vpu_dec_object, "video bit depth: %d min_buf_cnt %d", vpu_dec_object->init_info.nBitDepth, vpu_dec_object->min_buf_cnt);
+  GST_INFO_OBJECT(vpu_dec_object, "video bit depth: %d min_buf_cnt %d", vpu_dec_object->init_info.nBitDepth, vpu_dec_object->min_buf_cnt);
   GST_VIDEO_INFO_INTERLACE_MODE(&(state->info)) = \
     vpu_dec_object->init_info.nInterlace ? GST_VIDEO_INTERLACE_MODE_INTERLEAVED \
     : GST_VIDEO_INTERLACE_MODE_PROGRESSIVE;
